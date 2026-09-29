@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SupeChicken666 <me@supechicken666.dev>
+Date: Sun, 20 Sep 2026 17:20:29 +0800
+Subject: [PATCH 06/10] audio: Lower default latency to 21ms
+
+This prevents stuttering on audio-sensitive apps like rhythm games
+
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ audio/aidl/default/ModulePrimary.cpp | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/audio/aidl/default/ModulePrimary.cpp b/audio/aidl/default/ModulePrimary.cpp
+index 6648068c9..8526a87d4 100644
+--- a/audio/aidl/default/ModulePrimary.cpp
++++ b/audio/aidl/default/ModulePrimary.cpp
+@@ -122,10 +122,7 @@ ndk::ScopedAStatus ModulePrimary::createMmapBuffer(const AudioPortConfig& portCo
+ 
+ int32_t ModulePrimary::getNominalLatencyMs(const AudioPortConfig& portConfig) {
+     static constexpr int32_t kLowLatencyMs = 10;
+-    // 85 ms is chosen considering 4096 frames @ 48 kHz. This is the value which allows
+-    // the virtual Android device implementation to pass CTS. Hardware implementations
+-    // should have significantly lower latency.
+-    static constexpr int32_t kStandardLatencyMs = 85;
++    static constexpr int32_t kStandardLatencyMs = 21;
+     return hasMmapFlag(portConfig.flags.value()) ? kLowLatencyMs : kStandardLatencyMs;
+ }
+ 

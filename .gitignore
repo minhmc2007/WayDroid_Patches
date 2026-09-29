@@ -1,0 +1,9 @@
+# runtime bookkeeping produced by waydroid-patches.sh
+.state
+.conflicts/
+.manifest-state
+.applied
+
+# scratch
+*.orig
+*.rej

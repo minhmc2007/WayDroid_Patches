@@ -1,0 +1,1086 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SupeChicken666 <me@supechicken666.dev>
+Date: Sun, 20 Sep 2026 19:07:00 +0800
+Subject: [PATCH 08/10] audio: Implement PulseAudio backend for container usage
+
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ audio/aidl/default/Android.bp                 |   5 +
+ audio/aidl/default/ModulePrimary.cpp          |   9 +
+ .../include/core-impl/StreamPrimaryPulse.h    |  77 ++++
+ .../default/include/core-impl/StreamPulse.h   |  77 ++++
+ .../default/primary/StreamPrimaryPulse.cpp    | 124 ++++++
+ audio/aidl/default/pulse/Context.cpp          | 167 +++++++++
+ audio/aidl/default/pulse/Context.h            |  69 ++++
+ audio/aidl/default/pulse/StreamPulse.cpp      | 353 ++++++++++++++++++
+ audio/aidl/default/pulse/Utils.cpp            |  43 +++
+ audio/aidl/default/pulse/Utils.h              |  32 ++
+ 10 files changed, 956 insertions(+)
+ create mode 100644 audio/aidl/default/include/core-impl/StreamPrimaryPulse.h
+ create mode 100644 audio/aidl/default/include/core-impl/StreamPulse.h
+ create mode 100644 audio/aidl/default/primary/StreamPrimaryPulse.cpp
+ create mode 100644 audio/aidl/default/pulse/Context.cpp
+ create mode 100644 audio/aidl/default/pulse/Context.h
+ create mode 100644 audio/aidl/default/pulse/StreamPulse.cpp
+ create mode 100644 audio/aidl/default/pulse/Utils.cpp
+ create mode 100644 audio/aidl/default/pulse/Utils.h
+
+diff --git a/audio/aidl/default/Android.bp b/audio/aidl/default/Android.bp
+index 48c1fefcf..d4e653ad8 100644
+--- a/audio/aidl/default/Android.bp
++++ b/audio/aidl/default/Android.bp
+@@ -23,6 +23,7 @@ cc_defaults {
+         "libnbaio_mono",
+         "liblog",
+         "libmedia_helper",
++        "libpulse",
+         "libstagefright_foundation",
+         "libtinyalsav2",
+         "libutils",
+@@ -74,6 +75,10 @@ cc_library {
+         "deprecated/StreamSwitcher.cpp",
+         "primary/PrimaryMixer.cpp",
+         "primary/StreamPrimary.cpp",
++        "primary/StreamPrimaryPulse.cpp",
++        "pulse/Context.cpp",
++        "pulse/StreamPulse.cpp",
++        "pulse/Utils.cpp",
+         "r_submix/ModuleRemoteSubmix.cpp",
+         "r_submix/SubmixRoute.cpp",
+         "r_submix/StreamRemoteSubmix.cpp",
+diff --git a/audio/aidl/default/ModulePrimary.cpp b/audio/aidl/default/ModulePrimary.cpp
+index 8526a87d4..ed56cdfbb 100644
+--- a/audio/aidl/default/ModulePrimary.cpp
++++ b/audio/aidl/default/ModulePrimary.cpp
+@@ -19,11 +19,13 @@
+ #define LOG_TAG "AHAL_ModulePrimary"
+ #include <Utils.h>
+ #include <android-base/logging.h>
++#include <android-base/properties.h>
+ 
+ #include "core-impl/ModulePrimary.h"
+ #include "core-impl/StreamMmapStub.h"
+ #include "core-impl/StreamOffloadStub.h"
+ #include "core-impl/StreamPrimary.h"
++#include "core-impl/StreamPrimaryPulse.h"
+ #include "core-impl/Telephony.h"
+ 
+ using aidl::android::hardware::audio::common::areAllBitPositionFlagsSet;
+@@ -39,6 +41,7 @@ using aidl::android::media::audio::common::AudioPort;
+ using aidl::android::media::audio::common::AudioPortConfig;
+ using aidl::android::media::audio::common::AudioPortExt;
+ using aidl::android::media::audio::common::MicrophoneInfo;
++using android::base::GetBoolProperty;
+ 
+ namespace aidl::android::hardware::audio::core {
+ 
+@@ -71,6 +74,9 @@ ndk::ScopedAStatus ModulePrimary::createInputStream(StreamContext&& context,
+         // "Stub" is used because there is no support for MMAP audio I/O on CVD.
+         return createStreamInstance<StreamInMmapStub>(result, std::move(context), sinkMetadata,
+                                                       microphones);
++    } else if (GetBoolProperty("ro.boot.audio.pulseaudio", true)) {
++        return createStreamInstance<StreamInPrimaryPulse>(result, std::move(context), sinkMetadata,
++                                                          microphones);
+     }
+     return createStreamInstance<StreamInPrimary>(result, std::move(context), sinkMetadata,
+                                                  microphones);
+@@ -91,6 +97,9 @@ ndk::ScopedAStatus ModulePrimary::createOutputStream(
+         // playback over time.
+         return createStreamInstance<StreamOutOffloadStub>(result, std::move(context),
+                                                           sourceMetadata, offloadInfo);
++    } else if (GetBoolProperty("ro.boot.audio.pulseaudio", true)) {
++        return createStreamInstance<StreamOutPrimaryPulse>(result, std::move(context), sourceMetadata,
++                                                           offloadInfo);
+     }
+     return createStreamInstance<StreamOutPrimary>(result, std::move(context), sourceMetadata,
+                                                   offloadInfo);
+diff --git a/audio/aidl/default/include/core-impl/StreamPrimaryPulse.h b/audio/aidl/default/include/core-impl/StreamPrimaryPulse.h
+new file mode 100644
+index 000000000..4484b3e80
+--- /dev/null
++++ b/audio/aidl/default/include/core-impl/StreamPrimaryPulse.h
+@@ -0,0 +1,77 @@
++/*
++ * Copyright (C) 2023 The Android Open Source Project
++ * Copyright (C) 2026 The WayDroid-ATV Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#pragma once
++
++#include <vector>
++
++#include <android-base/thread_annotations.h>
++
++#include "StreamPulse.h"
++
++namespace aidl::android::hardware::audio::core {
++
++class StreamPrimaryPulse : public StreamPulse {
++  public:
++    StreamPrimaryPulse(StreamContext* context, const Metadata& metadata);
++
++    // Methods of 'DriverInterface'.
++    ::android::status_t flush() override;
++    ::android::status_t start() override;
++    ::android::status_t transfer(void* buffer, size_t frameCount, size_t* actualFrameCount,
++                                 int32_t* latencyMs) override;
++    ::android::status_t refinePosition(StreamDescriptor::Position* position) override;
++
++    // Overridden methods of 'StreamCommonImpl', called on a Binder thread.
++    ndk::ScopedAStatus setConnectedDevices(const ConnectedDevices& devices) override;
++
++  protected:
++    const bool mIsAsynchronous;
++    int64_t mStartTimeNs = 0;
++    long mFramesSinceStart = 0;
++};
++
++class StreamInPrimaryPulse final : public StreamIn,
++                                   public StreamPrimaryPulse,
++                                   public StreamInHwGainHelper {
++  public:
++    friend class ndk::SharedRefBase;
++    StreamInPrimaryPulse(
++            StreamContext&& context,
++            const ::aidl::android::hardware::audio::common::SinkMetadata& sinkMetadata,
++            const std::vector<::aidl::android::media::audio::common::MicrophoneInfo>& microphones);
++
++  private:
++    void onClose(StreamDescriptor::State) override { defaultOnClose(); }
++};
++
++class StreamOutPrimaryPulse final : public StreamOut,
++                                    public StreamPrimaryPulse,
++                                    public StreamOutHwVolumeHelper {
++  public:
++    friend class ndk::SharedRefBase;
++    StreamOutPrimaryPulse(StreamContext&& context,
++                          const ::aidl::android::hardware::audio::common::SourceMetadata& sourceMetadata,
++                          const std::optional<::aidl::android::media::audio::common::AudioOffloadInfo>& offloadInfo);
++
++  private:
++    void onClose(StreamDescriptor::State) override { defaultOnClose(); }
++
++    ndk::ScopedAStatus setHwVolume(const std::vector<float>& in_channelVolumes) override;
++};
++
++}  // namespace aidl::android::hardware::audio::core
+diff --git a/audio/aidl/default/include/core-impl/StreamPulse.h b/audio/aidl/default/include/core-impl/StreamPulse.h
+new file mode 100644
+index 000000000..077eae8b7
+--- /dev/null
++++ b/audio/aidl/default/include/core-impl/StreamPulse.h
+@@ -0,0 +1,77 @@
++/*
++ * Copyright (C) 2023 The Android Open Source Project
++ * Copyright (C) 2026 The WayDroid-ATV Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#pragma once
++
++#include <atomic>
++#include <memory>
++
++#include <media/nbaio/MonoPipe.h>
++#include <media/nbaio/MonoPipeReader.h>
++
++#include "Stream.h"
++#include "pulse/Context.h"
++#include "pulse/Utils.h"
++
++namespace aidl::android::hardware::audio::core {
++
++// This class is intended to be used as a base class for implementations
++// that use PulseAudio.
++// This class does not define a complete stream implementation,
++// and should never be used on its own. Derived classes are expected to
++// provide necessary overrides for all interface methods omitted here.
++class StreamPulse : public StreamCommonImpl {
++  public:
++    StreamPulse(StreamContext* context, const Metadata& metadata);
++    ~StreamPulse();
++
++    // Methods of 'DriverInterface'.
++    ::android::status_t init(DriverCallbackInterface* callback) override;
++    ::android::status_t drain(StreamDescriptor::DrainMode) override;
++    ::android::status_t flush() override;
++    ::android::status_t pause() override;
++    ::android::status_t standby() override;
++    ::android::status_t start() override;
++    ::android::status_t transfer(void* buffer, size_t frameCount, size_t* actualFrameCount,
++                                 int32_t* latencyMs) override;
++    void shutdown() override;
++    ndk::ScopedAStatus setGain(float gain) override;
++
++  protected:
++    const size_t mBufferSizeFrames;
++    const size_t mFrameSizeBytes;
++    const bool mIsInput;
++    const std::shared_ptr<pulse::Context> mPACtx;
++    const pa_sample_spec mPASampleSpec;
++
++    pa_stream* mPAStream;
++    uint32_t mPAStreamIndex = UINT32_MAX;
++
++  private:
++    ::android::NBAIO_Format getPipeFormat() const;
++    ::android::sp<::android::MonoPipe> makeSink(bool writeCanBlock);
++    ::android::sp<::android::MonoPipeReader> makeSource(::android::MonoPipe* pipe);
++    void registerCallbacks();
++
++    std::atomic<pa_usec_t> mLatency = 21000;
++
++    // Only 'libnbaio_mono' is vendor-accessible, thus no access to the multi-reader Pipe.
++    ::android::sp<::android::MonoPipe> mRecordSink;
++    ::android::sp<::android::MonoPipeReader> mRecordSource;
++};
++
++}  // namespace aidl::android::hardware::audio::core
+diff --git a/audio/aidl/default/primary/StreamPrimaryPulse.cpp b/audio/aidl/default/primary/StreamPrimaryPulse.cpp
+new file mode 100644
+index 000000000..883d42905
+--- /dev/null
++++ b/audio/aidl/default/primary/StreamPrimaryPulse.cpp
+@@ -0,0 +1,124 @@
++/*
++ * Copyright (C) 2023 The Android Open Source Project
++ * Copyright (C) 2026 The WayDroid-ATV Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#define LOG_TAG "AHAL_StreamPrimaryPulse"
++
++#include <cstdio>
++
++#include <android-base/logging.h>
++#include <android-base/parseint.h>
++#include <android-base/properties.h>
++#include <audio_utils/clock.h>
++#include <error/Result.h>
++#include <error/expected_utils.h>
++
++#include "core-impl/StreamPrimaryPulse.h"
++
++using aidl::android::hardware::audio::common::SinkMetadata;
++using aidl::android::hardware::audio::common::SourceMetadata;
++using aidl::android::media::audio::common::AudioDevice;
++using aidl::android::media::audio::common::AudioDeviceAddress;
++using aidl::android::media::audio::common::AudioDeviceDescription;
++using aidl::android::media::audio::common::AudioDeviceType;
++using aidl::android::media::audio::common::AudioOffloadInfo;
++using aidl::android::media::audio::common::MicrophoneInfo;
++using android::base::GetBoolProperty;
++
++namespace aidl::android::hardware::audio::core {
++
++StreamPrimaryPulse::StreamPrimaryPulse(StreamContext* context, const Metadata& metadata)
++    : StreamPulse(context, metadata),
++      mIsAsynchronous(!!getContext().getAsyncCallback()) {
++    context->startStreamDataProcessor();
++}
++
++::android::status_t StreamPrimaryPulse::flush() {
++    RETURN_STATUS_IF_ERROR(StreamPulse::flush());
++    // TODO(b/372951987): consider if this needs to be done from 'StreamInWorkerLogic::cycle'.
++    return mIsInput ? standby() : ::android::OK;
++}
++
++::android::status_t StreamPrimaryPulse::start() {
++    RETURN_STATUS_IF_ERROR(StreamPulse::start());
++    mStartTimeNs = ::android::uptimeNanos();
++    mFramesSinceStart = 0;
++    return ::android::OK;
++}
++
++::android::status_t StreamPrimaryPulse::transfer(void* buffer, size_t frameCount,
++                                            size_t* actualFrameCount, int32_t* latencyMs) {
++    RETURN_STATUS_IF_ERROR(
++            StreamPulse::transfer(buffer, frameCount, actualFrameCount, latencyMs));
++    if (!mIsAsynchronous) {
++        const long bufferDurationUs =
++                (*actualFrameCount) * MICROS_PER_SECOND / mContext.getSampleRate();
++        const auto totalDurationUs =
++                (::android::uptimeNanos() - mStartTimeNs) / NANOS_PER_MICROSECOND;
++        mFramesSinceStart += *actualFrameCount;
++        const long totalOffsetUs =
++                mFramesSinceStart * MICROS_PER_SECOND / mContext.getSampleRate() - totalDurationUs;
++        LOG(VERBOSE) << __func__ << ": totalOffsetUs " << totalOffsetUs;
++        if (totalOffsetUs > 0) {
++            const long sleepTimeUs = std::min(totalOffsetUs, bufferDurationUs);
++            LOG(VERBOSE) << __func__ << ": sleeping for " << sleepTimeUs << " us";
++            usleep(sleepTimeUs);
++        }
++    } else {
++        LOG(VERBOSE) << __func__ << ": asynchronous transfer";
++    }
++    return ::android::OK;
++}
++
++::android::status_t StreamPrimaryPulse::refinePosition(StreamDescriptor::Position*) {
++    // Since not all data is actually sent to the HAL, use the position maintained by Stream class
++    // which accounts for all frames passed from / to the client.
++    return ::android::OK;
++}
++
++ndk::ScopedAStatus StreamPrimaryPulse::setConnectedDevices(const ConnectedDevices& devices) {
++    LOG(DEBUG) << __func__ << ": " << ::android::internal::ToString(devices);
++    if (devices.size() > 1) {
++        LOG(ERROR) << __func__ << ": primary stream can only be connected to one device, got: "
++                   << devices.size();
++        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
++    }
++    if (!devices.empty()) {
++        auto streamDataProcessor = getContext().getStreamDataProcessor().lock();
++        if (streamDataProcessor != nullptr) {
++            streamDataProcessor->setAudioDevice(devices[0]);
++        }
++    }
++    return StreamPulse::setConnectedDevices(devices);
++}
++
++StreamInPrimaryPulse::StreamInPrimaryPulse(StreamContext&& context, const SinkMetadata& sinkMetadata,
++                                           const std::vector<MicrophoneInfo>& microphones)
++    : StreamIn(std::move(context), microphones),
++      StreamPrimaryPulse(&mContextInstance, sinkMetadata),
++      StreamInHwGainHelper(&mContextInstance) {}
++
++StreamOutPrimaryPulse::StreamOutPrimaryPulse(StreamContext&& context, const SourceMetadata& sourceMetadata,
++                                             const std::optional<AudioOffloadInfo>& offloadInfo)
++    : StreamOut(std::move(context), offloadInfo),
++      StreamPrimaryPulse(&mContextInstance, sourceMetadata),
++      StreamOutHwVolumeHelper(&mContextInstance) {}
++
++ndk::ScopedAStatus StreamOutPrimaryPulse::setHwVolume(const std::vector<float>& /*in_channelVolumes*/) {
++    return ndk::ScopedAStatus::ok();
++}
++
++}  // namespace aidl::android::hardware::audio::core
+diff --git a/audio/aidl/default/pulse/Context.cpp b/audio/aidl/default/pulse/Context.cpp
+new file mode 100644
+index 000000000..ae9df105b
+--- /dev/null
++++ b/audio/aidl/default/pulse/Context.cpp
+@@ -0,0 +1,167 @@
++/*
++ * Copyright (C) 2026 The WayDroid-ATV Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <chrono>
++#include <format>
++#include <future>
++#include <string>
++
++#define LOG_TAG "AHAL_PulseAudio"
++#include <android-base/logging.h>
++
++#include <android-base/properties.h>
++
++#include "Context.h"
++
++namespace aidl::android::hardware::audio::core::pulse {
++
++using ::android::base::GetProperty;
++
++Context::Context()
++    : mMainloop(nullptr, MainloopDeleter()),
++      mCtx(nullptr, ContextDeleter(this)) {}
++
++::android::status_t Context::init() {
++    static std::once_flag initialized;
++
++    std::call_once(initialized, [&]() {
++        const std::string pulseServerPath = std::format(
++            "unix:{}/native",
++            GetProperty("waydroid.pulse_runtime_path", "/run/user/1000/pulse")
++        );
++
++        LOG(DEBUG) << __func__ << ": libpulse is initializing...";
++
++        mMainloop.reset(pa_threaded_mainloop_new());
++        if (mMainloop == nullptr) {
++            LOG(ERROR) << __func__ << ": mainloop creation failed";
++            return;
++        }
++
++        int ret = pa_threaded_mainloop_start(mMainloop.get());
++        if (ret < 0) {
++            LOG(ERROR) << __func__ << ": libpulse failed to start: " << pa_strerror(ret);
++            return;
++        }
++
++        LOG(DEBUG) << __func__ << ": libpulse mainloop started";
++
++        // Create context and wait for creation
++        withLock([&]() {
++            mCtx.reset(pa_context_new(pa_threaded_mainloop_get_api(mMainloop.get()), "Waydroid"));
++
++            if (mCtx == nullptr) {
++                LOG(ERROR) << __func__ << ": failed to create PulseAudio context";
++                return;
++            }
++
++            pa_context_set_state_callback(mCtx.get(), [](auto, void* userdata) {
++                pa_threaded_mainloop_signal(reinterpret_cast<pa_threaded_mainloop*>(userdata), 0);
++            }, mMainloop.get());
++
++            if (pa_context_connect(mCtx.get(), pulseServerPath.c_str(), PA_CONTEXT_NOFLAGS, nullptr) < 0) {
++                LOG(ERROR) << __func__ << ": failed to create PulseAudio context";
++                return;
++            }
++
++            // Wait until context is ready
++            while (pa_context_state_t s = pa_context_get_state(mCtx.get())) {
++                if (!PA_CONTEXT_IS_GOOD(s) || s == PA_CONTEXT_READY) {
++                    break;
++                }
++                pa_threaded_mainloop_wait(mMainloop.get());
++            }
++        });
++    });
++
++    // Verify context status, reset to nullptr if failed
++    if (mMainloop && mCtx) {
++        withLock([&]() {
++            if (pa_context_get_state(mCtx.get()) != PA_CONTEXT_READY) {
++                mCtx.reset();
++            }
++        });
++    }
++
++    if (mMainloop && mCtx) {
++        LOG(INFO) << __func__ << ": PulseAudio context created successfully";
++        return ::android::OK;
++    } else {
++        LOG(ERROR) << __func__ << ": Failed to initialize PulseAudio context";
++        return ::android::NO_INIT;
++    }
++}
++
++const char* Context::getLastError() {
++    return pa_strerror(pa_context_errno(mCtx.get()));
++}
++
++bool Context::waitForOperation(const std::function<pa_operation*(pa_context_success_cb_t, std::promise<bool>*)>& lambda) {
++    std::promise<bool> promise;
++    std::future<bool> future = promise.get_future();
++    pa_operation *op;
++
++    withLock([&]() {
++        op = lambda([](pa_context*, int success, void* userdata) {
++            reinterpret_cast<std::promise<bool>*>(userdata)->set_value(success == 1);
++        }, &promise);
++    });
++
++    if (op == nullptr) return false;
++
++    // Timeout for all operations
++    std::future_status status = future.wait_for(std::chrono::seconds(5));
++    withLock([&]() {
++        if (status == std::future_status::timeout) pa_operation_cancel(op);
++        pa_operation_unref(op);
++    });
++    return (status == std::future_status::timeout) ? false : future.get();
++}
++
++bool Context::waitForStreamOperation(const std::function<pa_operation*(pa_stream_success_cb_t, std::promise<bool>*)>& lambda) {
++    std::promise<bool> promise;
++    std::future<bool> future = promise.get_future();
++    pa_operation *op;
++
++    withLock([&]() {
++        op = lambda([](pa_stream*, int success, void* userdata) {
++            reinterpret_cast<std::promise<bool>*>(userdata)->set_value(success == 1);
++        }, &promise);
++    });
++
++    if (op == nullptr) return false;
++
++    // Timeout for all operations
++    std::future_status status = future.wait_for(std::chrono::seconds(5));
++    withLock([&]() {
++        if (status == std::future_status::timeout) pa_operation_cancel(op);
++        pa_operation_unref(op);
++    });
++    return (status == std::future_status::timeout) ? false : future.get();
++}
++
++void Context::withLock(const std::function<void()>& lambda) {
++    pa_threaded_mainloop_lock(mMainloop.get());
++    if (lambda) lambda();
++    pa_threaded_mainloop_unlock(mMainloop.get());
++}
++
++std::shared_ptr<Context> Context::getContext() {
++    static std::shared_ptr<Context> ctx(new Context());
++    return ctx;
++}
++
++}  // namespace aidl::android::hardware::audio::core::pulse
+diff --git a/audio/aidl/default/pulse/Context.h b/audio/aidl/default/pulse/Context.h
+new file mode 100644
+index 000000000..d52c4d362
+--- /dev/null
++++ b/audio/aidl/default/pulse/Context.h
+@@ -0,0 +1,69 @@
++/*
++ * Copyright (C) 2026 The WayDroid-ATV Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#pragma once
++
++#include <functional>
++#include <future>
++#include <memory>
++#include <mutex>
++
++extern "C" {
++#include <pulse/pulseaudio.h>
++}
++
++#include <utils/Errors.h>
++
++namespace aidl::android::hardware::audio::core::pulse {
++
++// A class for PulseAudio context
++class Context {
++  protected:
++    struct MainloopDeleter {
++        void operator()(pa_threaded_mainloop *mainloop) const {
++            pa_threaded_mainloop_stop(mainloop);
++            pa_threaded_mainloop_free(mainloop);
++        }
++    };
++
++    struct ContextDeleter {
++        Context *mInstance;
++        ContextDeleter(Context *instance) : mInstance(instance) {}
++
++        void operator()(pa_context *ctx) const {
++            if (ctx == nullptr) return;
++            mInstance->withLock([&]() {
++                pa_context_disconnect(ctx);
++                pa_context_unref(ctx);
++            });
++        }
++    };
++
++    Context();
++
++  public:
++    std::unique_ptr<pa_threaded_mainloop, MainloopDeleter> mMainloop;
++    std::unique_ptr<pa_context, ContextDeleter> mCtx;
++
++    ::android::status_t init();
++    const char* getLastError();
++    bool waitForOperation(const std::function<pa_operation*(pa_context_success_cb_t, std::promise<bool>*)>& lambda);
++    bool waitForStreamOperation(const std::function<pa_operation*(pa_stream_success_cb_t, std::promise<bool>*)>& lambda);
++    void withLock(const std::function<void()>& lambda);
++    static std::shared_ptr<Context> getContext();
++};
++
++}  // namespace aidl::android::hardware::audio::core::pulse
+diff --git a/audio/aidl/default/pulse/StreamPulse.cpp b/audio/aidl/default/pulse/StreamPulse.cpp
+new file mode 100644
+index 000000000..71501c60d
+--- /dev/null
++++ b/audio/aidl/default/pulse/StreamPulse.cpp
+@@ -0,0 +1,353 @@
++/*
++ * Copyright (C) 2023 The Android Open Source Project
++ * Copyright (C) 2026 The WayDroid-ATV Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <cmath>
++#include <format>
++#include <limits>
++
++#define LOG_TAG "AHAL_StreamPulse"
++#include <android-base/logging.h>
++
++#include <Utils.h>
++#include <audio_utils/clock.h>
++#include <error/expected_utils.h>
++#include <media/AidlConversionCppNdk.h>
++
++#include "core-impl/StreamPulse.h"
++
++using aidl::android::hardware::audio::common::getChannelCount;
++
++namespace aidl::android::hardware::audio::core {
++
++StreamPulse::StreamPulse(StreamContext* context, const Metadata& metadata)
++    : StreamCommonImpl(context, metadata),
++      mBufferSizeFrames(getContext().getBufferSizeInFrames()),
++      mFrameSizeBytes(getContext().getFrameSize()),
++      mIsInput(isInput(metadata)),
++      mPACtx(pulse::Context::getContext()),
++      mPASampleSpec{
++          .format = pulse::getPASampleFormat(getContext().getFormat()),
++          .rate = static_cast<uint32_t>(getContext().getSampleRate()),
++          .channels = static_cast<uint8_t>(getChannelCount(getContext().getChannelLayout())),
++      } {}
++
++StreamPulse::~StreamPulse() {
++    cleanupWorker();
++}
++
++::android::NBAIO_Format StreamPulse::getPipeFormat() const {
++    const audio_format_t audioFormat = VALUE_OR_FATAL(
++            aidl2legacy_AudioFormatDescription_audio_format_t(getContext().getFormat()));
++    return ::android::Format_from_SR_C(mPASampleSpec.rate, mPASampleSpec.channels, audioFormat);
++}
++
++::android::sp<::android::MonoPipe> StreamPulse::makeSink(bool writeCanBlock) {
++    const ::android::NBAIO_Format format = getPipeFormat();
++    auto sink = ::android::sp<::android::MonoPipe>::make(mBufferSizeFrames, format, writeCanBlock);
++    const ::android::NBAIO_Format offers[1] = {format};
++    size_t numCounterOffers = 0;
++    ssize_t index = sink->negotiate(offers, 1, nullptr, numCounterOffers);
++    LOG_IF(FATAL, index != 0) << __func__ << ": Negotiation for the sink failed, index = " << index;
++    return sink;
++}
++
++::android::sp<::android::MonoPipeReader> StreamPulse::makeSource(::android::MonoPipe* pipe) {
++    const ::android::NBAIO_Format format = getPipeFormat();
++    const ::android::NBAIO_Format offers[1] = {format};
++    auto source = ::android::sp<::android::MonoPipeReader>::make(pipe);
++    size_t numCounterOffers = 0;
++    ssize_t index = source->negotiate(offers, 1, nullptr, numCounterOffers);
++    LOG_IF(FATAL, index != 0) << __func__
++                              << ": Negotiation for the source failed, index = " << index;
++    return source;
++}
++
++::android::status_t StreamPulse::init(DriverCallbackInterface* /*callback*/) {
++    ::android::status_t ret = ::android::OK;
++
++    if ((ret = mPACtx->init()) != ::android::OK) {
++        return ret;
++    }
++
++    mPACtx->withLock([&]() {
++        const pa_buffer_attr bufferAttr = {
++            .maxlength = static_cast<uint32_t>(mBufferSizeFrames * mFrameSizeBytes * 2),
++            .tlength = static_cast<uint32_t>(pa_usec_to_bytes(21000, &mPASampleSpec)),
++            .prebuf = static_cast<uint32_t>(-1),
++            .minreq = static_cast<uint32_t>(-1),
++            .fragsize = static_cast<uint32_t>(mBufferSizeFrames * mFrameSizeBytes),
++        };
++
++        constexpr pa_stream_flags_t streamFlags = static_cast<pa_stream_flags_t>(
++            PA_STREAM_ADJUST_LATENCY |
++            PA_STREAM_AUTO_TIMING_UPDATE |
++            PA_STREAM_START_CORKED
++        );
++
++        const std::string streamName = std::format("Android {} @ {}Hz",
++                                                   mIsInput ? "Record" : "Playback",
++                                                   mPASampleSpec.rate);
++        mPAStream = pa_stream_new(mPACtx->mCtx.get(), streamName.c_str(), &mPASampleSpec, nullptr);
++
++        if (mPAStream == nullptr) {
++            ret = ::android::NO_INIT;
++            return;
++        }
++
++        if (mIsInput) {
++            mRecordSink = makeSink(false);
++            mRecordSource = makeSource(mRecordSink.get());
++        }
++
++        // Register callbacks
++        registerCallbacks();
++
++        // Connect stream
++        int connectRet;
++        if (mIsInput) {
++            connectRet = pa_stream_connect_record(mPAStream, nullptr, &bufferAttr, streamFlags);
++        } else {
++            connectRet = pa_stream_connect_playback(mPAStream, nullptr, &bufferAttr, streamFlags, nullptr, nullptr);
++        }
++
++        // Wait until context is ready
++        if (connectRet == 0) {
++            while (pa_stream_get_state(mPAStream) == PA_STREAM_CREATING) {
++                pa_threaded_mainloop_wait(mPACtx->mMainloop.get());
++            }
++        }
++    });
++
++    if (mPAStream == nullptr || pa_stream_get_state(mPAStream) != PA_STREAM_READY) {
++        LOG(ERROR) << __func__ << ": Failed to connect stream to sink: "
++                               << pa_strerror(pa_context_errno(mPACtx->mCtx.get()));
++
++        ret = ::android::NO_INIT;
++    }
++
++    mPAStreamIndex = pa_stream_get_index(mPAStream);
++    LOG(INFO) << __func__ << ": Stream initialized, index = " << mPAStreamIndex << ", mIsInput = " << mIsInput;
++    return ret;
++}
++
++::android::status_t StreamPulse::drain(StreamDescriptor::DrainMode) {
++    if (mPAStream == nullptr) {
++        LOG(ERROR) << __func__ << ": Stream not initialized";
++        return ::android::NO_INIT;
++    }
++
++    if (mIsInput) {
++        return ::android::OK;
++    } else {
++        bool success = mPACtx->waitForStreamOperation([&](auto cb, auto p) -> auto {
++            return pa_stream_drain(mPAStream, cb, p);
++        });
++
++        LOG(INFO) << __func__ << ": Stream drained, success = " << success;
++        return success ? ::android::OK : ::android::INVALID_OPERATION;
++    }
++}
++
++::android::status_t StreamPulse::flush() {
++    if (mPAStream == nullptr) {
++        LOG(ERROR) << __func__ << ": Stream not initialized";
++        return ::android::NO_INIT;
++    }
++
++    bool success = mPACtx->waitForStreamOperation([&](auto cb, auto p) -> auto {
++        return pa_stream_flush(mPAStream, cb, p);
++    });
++
++    LOG(INFO) << __func__ << ": Stream flushed, success = " << success;
++    return success ? ::android::OK : ::android::INVALID_OPERATION;
++}
++
++::android::status_t StreamPulse::pause() {
++    if (mPAStream == nullptr) {
++        LOG(ERROR) << __func__ << ": Stream not initialized";
++        return ::android::NO_INIT;
++    }
++
++    bool success = mPACtx->waitForStreamOperation([&](auto cb, auto p) -> auto {
++        return pa_stream_cork(mPAStream, 1, cb, p);
++    });
++
++    LOG(INFO) << __func__ << ": Stream paused, success = " << success;
++    return success ? ::android::OK : ::android::INVALID_OPERATION;
++}
++
++::android::status_t StreamPulse::standby() {
++    if (mPAStream == nullptr) {
++        LOG(ERROR) << __func__ << ": Stream not initialized";
++        return ::android::NO_INIT;
++    }
++
++    return pause();
++}
++
++::android::status_t StreamPulse::start() {
++    if (mPAStream == nullptr) {
++        LOG(ERROR) << __func__ << ": Stream not initialized";
++        return ::android::NO_INIT;
++    }
++
++    bool success = mPACtx->waitForStreamOperation([&](auto cb, auto p) -> auto {
++        return pa_stream_cork(mPAStream, 0, cb, p);
++    });
++
++    LOG(INFO) << __func__ << ": Stream started, success = " << success;
++    return success ? ::android::OK : ::android::INVALID_OPERATION;
++}
++
++::android::status_t StreamPulse::transfer(void* buffer, size_t frameCount, size_t* actualFrameCount,
++                                         int32_t* latencyMs) {
++    if (mPAStream == nullptr) {
++        LOG(ERROR) << __func__ << ": Stream not initialized";
++        return ::android::NO_INIT;
++    }
++
++    const size_t bytesToTransfer = frameCount * mFrameSizeBytes;
++    char* bufferOffset = reinterpret_cast<char*>(buffer);
++
++    if (mIsInput) {
++        size_t remainingFrames = frameCount;
++        while (remainingFrames > 0) {
++            ssize_t framesReadOrError = mRecordSource->read(bufferOffset, remainingFrames);
++            if (framesReadOrError < 0) {
++                LOG(FATAL) << __func__ << ": Error reading from the pipe: " << framesReadOrError;
++                return ::android::INVALID_OPERATION;
++            }
++
++            bufferOffset += framesReadOrError * mFrameSizeBytes;
++            remainingFrames -= framesReadOrError;
++
++            // MonoPipeReader does not have a blocking read, while use of std::condition_variable
++            // requires use of a mutex. For now, just do a 1ms sleep. Consider using a different
++            // pipe / ring buffer mechanism.
++            if (remainingFrames != 0) usleep(1000);
++        }
++    } else {
++        mPACtx->withLock([&, fname = __func__]() {
++            size_t remainingBytes = bytesToTransfer;
++            while (remainingBytes > 0) {
++                size_t writable;
++                while ((writable = pa_stream_writable_size(mPAStream)) == 0) {
++                    pa_threaded_mainloop_wait(mPACtx->mMainloop.get());
++                }
++
++                size_t bytesToWrite = std::min(writable, remainingBytes);
++                if (pa_stream_write(mPAStream, bufferOffset, bytesToWrite, nullptr, 0, PA_SEEK_RELATIVE) < 0) {
++                    LOG(ERROR) << fname << ": Failed to write into PulseAudio: " << mPACtx->getLastError();
++                    return;
++                }
++
++                bufferOffset += bytesToWrite;
++                remainingBytes -= bytesToWrite;
++            }
++        });
++    }
++
++    *actualFrameCount = frameCount;
++    *latencyMs = std::min(mLatency / PA_USEC_PER_MSEC, static_cast<pa_usec_t>(INT32_MAX));
++    return ::android::OK;
++}
++
++void StreamPulse::shutdown() {
++    if (mPAStream == nullptr) return;
++
++    pa_stream_disconnect(mPAStream);
++    pa_stream_unref(mPAStream);
++    LOG(INFO) << __func__ << ": Stream shutted down, mIsInput = " << mIsInput;
++}
++
++ndk::ScopedAStatus StreamPulse::setGain(float gain) {
++    if (mPAStream == nullptr) {
++        LOG(ERROR) << __func__ << ": Stream not initialized";
++        return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
++    }
++
++    bool success = mPACtx->waitForOperation([&](auto cb, auto p) -> auto {
++        pa_cvolume volume = { .channels = static_cast<uint8_t>(mPASampleSpec.channels) };
++        pa_cvolume_set(&volume, mPASampleSpec.channels, pa_sw_volume_from_linear(gain));
++
++        return mIsInput ? pa_context_set_source_output_volume(mPACtx->mCtx.get(), mPAStreamIndex, &volume, cb, p)
++                        : pa_context_set_sink_input_volume(mPACtx->mCtx.get(), mPAStreamIndex, &volume, cb, p);
++    });
++
++    LOG(INFO) << __func__ << ": Set gain = " << gain << ", success = " << success;
++    return success ? ndk::ScopedAStatus::ok() : ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
++}
++
++static void streamLatencyCallback(pa_stream* s, void* userdata) {
++    pa_usec_t latency;
++    int negative;
++
++    if (pa_stream_get_latency(s, &latency, &negative) < 0) {
++        LOG(ERROR) << __func__ << ": Failed to fetch latency info";
++        latency = static_cast<pa_usec_t>(-1);
++    } else if (negative == 1 || latency == 0) {
++        LOG(VERBOSE) << __func__ << ": Zero or negative latency value reported";
++        return;
++    }
++
++    reinterpret_cast<std::atomic<pa_usec_t>*>(userdata)->store(latency);
++}
++
++static void streamReadCallback(pa_stream* s, size_t nbytes, void* userdata) {
++    ::android::MonoPipe* sink = reinterpret_cast<::android::MonoPipe*>(userdata);
++    const char* buffer = nullptr;
++
++    if (int ret = pa_stream_peek(s, reinterpret_cast<const void**>(&buffer), &nbytes); ret < 0) {
++        LOG(ERROR) << __func__ << ": Error reading from PulseAudio: " << ret;
++        return;
++    }
++
++    const size_t totalFrames = nbytes / pa_frame_size(pa_stream_get_sample_spec(s));
++    ssize_t framesWritten = sink->write(buffer, totalFrames);
++
++    if (framesWritten < 0) {
++        LOG(ERROR) << __func__ << ": Error while writing into the pipe: "
++                   << framesWritten;
++        return;
++    } else if (ssize_t framesLost = static_cast<ssize_t>(totalFrames) - framesWritten;
++               framesLost > 0) {
++        LOG(WARNING) << __func__ << ": Sink has incomplete data sent, dropping "
++                     << framesLost << " frames";
++    }
++
++    if (int ret = pa_stream_drop(s); ret < 0) {
++        LOG(ERROR) << __func__ << ": Error while dropping fragment: " << ret;
++        return;
++    }
++}
++
++void StreamPulse::registerCallbacks() {
++    pa_stream_set_latency_update_callback(mPAStream, streamLatencyCallback, &mLatency);
++    pa_stream_set_state_callback(mPAStream, [](auto, void* userdata) {
++        pa_threaded_mainloop_signal(reinterpret_cast<pa_threaded_mainloop*>(userdata), 0);
++    }, mPACtx->mMainloop.get());
++
++    if (mIsInput) {
++        pa_stream_set_read_callback(mPAStream, streamReadCallback, mRecordSink.get());
++    } else {
++        pa_stream_set_write_callback(mPAStream, [](auto, auto, void* userdata) {
++            pa_threaded_mainloop_signal(reinterpret_cast<pa_threaded_mainloop*>(userdata), 0);
++        }, mPACtx->mMainloop.get());
++    }
++}
++
++}  // namespace aidl::android::hardware::audio::core
+diff --git a/audio/aidl/default/pulse/Utils.cpp b/audio/aidl/default/pulse/Utils.cpp
+new file mode 100644
+index 000000000..d012cbe02
+--- /dev/null
++++ b/audio/aidl/default/pulse/Utils.cpp
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (C) 2026 The WayDroid-ATV Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <map>
++#include <memory>
++
++#include "Utils.h"
++
++namespace aidl::android::hardware::audio::core::pulse {
++
++using android::media::audio::common::AudioFormatType;
++using android::media::audio::common::PcmType;
++
++pa_sample_format_t getPASampleFormat(const AudioFormatDescription& desc) {
++    if (desc.type != AudioFormatType::PCM) return PA_SAMPLE_INVALID;
++
++    static const std::map<PcmType, pa_sample_format_t> sampleFormatMap = {
++        { PcmType::UINT_8_BIT,   PA_SAMPLE_U8       },
++        { PcmType::INT_16_BIT,   PA_SAMPLE_S16LE    },
++        { PcmType::INT_32_BIT,   PA_SAMPLE_S32LE    },
++        { PcmType::FIXED_Q_8_24, PA_SAMPLE_S24_32LE },
++        { PcmType::FLOAT_32_BIT, PA_SAMPLE_FLOAT32  },
++        { PcmType::INT_24_BIT,   PA_SAMPLE_S24LE    },
++    };
++
++    auto it = sampleFormatMap.find(desc.pcm);
++    return (it == sampleFormatMap.end()) ? PA_SAMPLE_INVALID : it->second;
++}
++
++}
+diff --git a/audio/aidl/default/pulse/Utils.h b/audio/aidl/default/pulse/Utils.h
+new file mode 100644
+index 000000000..a35579df0
+--- /dev/null
++++ b/audio/aidl/default/pulse/Utils.h
+@@ -0,0 +1,32 @@
++/*
++ * Copyright (C) 2026 The WayDroid-ATV Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#pragma once
++
++#include <aidl/android/media/audio/common/AudioFormatDescription.h>
++#include <memory>
++
++extern "C" {
++#include <pulse/pulseaudio.h>
++}
++
++namespace aidl::android::hardware::audio::core::pulse {
++
++using aidl::android::media::audio::common::AudioFormatDescription;
++
++pa_sample_format_t getPASampleFormat(const AudioFormatDescription& desc);
++
++}

@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SupeChicken666 <me@supechicken666.dev>
+Date: Wed, 23 Sep 2026 10:51:43 +0800
+Subject: [PATCH 32/33] ueventd: Ignore ALSA device uevent by default
+
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ init/devices.cpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/init/devices.cpp b/init/devices.cpp
+index 7ec33ff..da0c12e 100644
+--- a/init/devices.cpp
++++ b/init/devices.cpp
+@@ -816,13 +816,14 @@ void DeviceHandler::HandleUevent(const Uevent& uevent) {
+         devpath = "/dev/" + Basename(uevent.path);
+     }
+ 
+-    // Waydroid: ignore input/TTY devices by default
++    // Waydroid: ignore input/ALSA/TTY devices by default
++    auto alsa_dev = (uevent.major == 116);
+     auto tty_dev = (uevent.major != 5 && StartsWith(uevent.device_name, "tty"));
+     auto input_dev = StartsWith(uevent.device_name, "input/");
+     auto hwcomposer = base::GetProperty("ro.hardware.hwcomposer", "");
+     auto whitelist = base::Split(base::GetProperty("persist.waydroid.uevent.whitelist", ""), ":");
+ 
+-    if ((tty_dev || (input_dev && hwcomposer != "drm_minigbm")) &&
++    if ((alsa_dev || tty_dev || (input_dev && hwcomposer != "drm_minigbm")) &&
+         std::count(whitelist.begin(), whitelist.end(), Basename(uevent.device_name)) == 0)
+     {
+         return;

@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SupeChicken666 <me@supechicken666.dev>
+Date: Sun, 12 Jul 2026 21:23:32 +0800
+Subject: [PATCH 27/33] init: Mount /metadata on boot
+
+On normal Android devices, it is a separate partition. And we bind mount it to /data/metadata instead
+
+It seems to be necessary on A17
+
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ rootdir/init.rc | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/rootdir/init.rc b/rootdir/init.rc
+index 4305d9c..595c1f4 100644
+--- a/rootdir/init.rc
++++ b/rootdir/init.rc
+@@ -639,7 +639,9 @@ on post-fs
+     # create the lost+found directories, so as to enforce our permissions
+     mkdir /cache/lost+found 0770 root root
+ 
+-    restorecon_recursive /metadata
++    mkdir /data/metadata 0755 root root
++    mount none /data/metadata /metadata bind rec
++
+     mkdir /metadata/vold
+     chmod 0700 /metadata/vold
+     mkdir /metadata/password_slots 0771 root system
