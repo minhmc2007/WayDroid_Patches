@@ -16,7 +16,7 @@ sudo pacman -S --needed \
     lzop pngcrush rsync schedtool squashfs-tools xsltproc zip \
     python-setuptools python-mako python-yaml cbindgen clang lib32-glibc \
     openjdk-17-jdk
-rustup target add x86_64-linux-android
+rustup target add x86_64-linux-android i686-linux-android
 ```
 
 `python-mako`, `cbindgen`, `clang` and `lib32-glibc` are the four that bite.
