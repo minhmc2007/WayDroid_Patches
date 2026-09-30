@@ -14,6 +14,7 @@ actual error.
 | `external/rust/android-crates-io/0001` | set `drm_syncobj_handle.point` | AOSP ships drm-ffi 0.9.0 against a drm-sys that has the field |
 | `external/minigbm/0001` | drop the hbm dependency | soong refuses a live module depending on a disabled one |
 | `external/mesa3d/0001` | call `ld.lld` by absolute path | the meson rule's PATH has no AOSP clang directory |
+| `prebuilts/mesa-tools/0001` | symlink `libxml2.so.2` | the bundled `libLLVM.so.20.1` needs a soname the host does not have |
 
 ## Why hbm is disabled rather than fixed
 
@@ -38,6 +39,20 @@ consumer anywhere in the tree, and its reference is removed in the same change.
 
 **Cost:** the image has no HBM helper path. If that turns out to matter, option 2
 is the real fix and option 1 should be reverted.
+
+## The mesa-tools one is a soname alias, not a real library
+
+`prebuilts/mesa-tools/root/lib64/libLLVM.so.20.1` is linked against
+`libxml2.so.2`, the soname of libxml2 2.9. The prebuilt ships no libxml2
+in `root/lib64`, and the `mesa_clc` wrapper puts only that directory on
+`LD_LIBRARY_PATH`, so it has to resolve from the host. Arch has libxml2
+2.15, whose soname is `libxml2.so.16`.
+
+The patch symlinks the newer soname to the old name. Shader compilation
+was verified to work. This is an alias, not the library LLVM 20 was built
+against, so any mesa path needing a real ABI 2.9 symbol would still fail.
+The wrapper only SHA-256 verifies files that have a `.sha256` beside them,
+and this symlink has none, so it is neither verified nor clobbered.
 
 ## The drm-ffi one is an AOSP inconsistency, not ours
 
