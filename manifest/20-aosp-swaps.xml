@@ -47,6 +47,27 @@
   <remove-project name="platform/external/libdrm" />
   <project path="external/libdrm" name="WayDroid-ATV/android_external_libdrm" remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
 
+  <!--
+    gmmlib. Intel's media-driver 26.1.5 (synced above as
+    vendor/intel/media-driver) needs IGFX_NVL_XE3G, which is declared only
+    by intel/gmmlib at tag intel-gmmlib-22.10.0. LineageOS's
+    platform/external/gmmlib has no IGFX_NVL ids at all, so building
+    media-driver against it gives 7 undeclared-identifier errors in
+    media_interfaces_nvls.cpp.
+
+    This is the same duplication that made gmmlib a candidate for dropping
+    earlier, but dropping it was wrong: it is not that gmmlib is redundant,
+    it is that intel's tree is a different, newer revision than LineageOS's.
+    Removing LineageOS's copy and adding intel's is the only way to get
+    IGFX_NVL_XE3G, and media-driver is useless without it.
+
+    Note 0001-Android.bp-Update-source-file-list.patch adds
+    GmmXe3P_XPCCachePolicy.cpp, which exists only in intel's snapshot and
+    not in LineageOS's, so it is needed here where it was not needed there.
+  -->
+  <remove-project name="platform/external/gmmlib" />
+  <project path="vendor/intel/gmmlib" name="intel/gmmlib" remote="ghub" clone-depth="1" revision="refs/tags/intel-gmmlib-22.10.0" />
+
   <!-- VA-API userspace -->
   <remove-project name="platform/external/libva" />
   <project path="external/libva" name="WayDroid-ATV/android_external_libva" remote="ghub" clone-depth="1" revision="refs/heads/14-x86" />
