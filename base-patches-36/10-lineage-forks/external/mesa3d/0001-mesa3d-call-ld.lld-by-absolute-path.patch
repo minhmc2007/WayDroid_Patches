@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Wed, 30 Sep 2026 12:56:30 +0700
+Subject: [PATCH] mesa3d: call ld.lld by absolute path
+
+  obj/MESON_MESA3D_GEN/ld.lld: line 2: exec: ld.lld: not found
+
+The generated linker wrapper was
+
+  #!/bin/bash -e
+  exec ld.lld "${@/-lc++/}"
+
+and the meson rule runs with PATH=~/.cargo/bin:/usr/bin:/usr/local/bin:$PATH,
+which has no AOSP clang directory, so the bare name could not resolve.
+prebuilts/build-tools only symlinks the mesa_clc family onto PATH and
+never provided ld.lld.
+
+Use the absolute path, derived from $(TARGET_AR), which this file already
+references for ar, so the linker can never drift from the toolchain that
+the cross file already pins.
+---
+ android/mesa3d_cross.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/android/mesa3d_cross.mk b/android/mesa3d_cross.mk
+index 53e8870..fc151bb 100644
+--- a/android/mesa3d_cross.mk
++++ b/android/mesa3d_cross.mk
+@@ -252,7 +252,7 @@ $(MESON_GEN_FILES_TARGET): PREPROCESS_MESON_CONFIGS:=$(PREPROCESS_MESON_CONFIGS)
+ $(MESON_GEN_FILES_TARGET): MESON_GEN_DIR:=$(MESON_GEN_DIR)
+ $(MESON_GEN_FILES_TARGET): $(sort $(shell find -L $(MESA3D_TOP) -not -path '*/\.*'))
+ 	mkdir -p $(dir $@)
+-	echo -e '#!/bin/bash -e\nexec ld.lld "$${@/-lc++/}"' > $(dir $@)/ld.lld
++	echo -e '#!/bin/bash -e\nexec $(dir $(AOSP_ABSOLUTE_PATH)/$($($(M_TARGET_PREFIX))TARGET_AR))ld.lld "$${@/-lc++/}"' > $(dir $@)/ld.lld
+ 	chmod +x $(dir $@)/ld.lld
+ 	echo -e "[properties]\n"                                                                                                  \
+ 		"c_args = [$(foreach flag,$(call filter-c-flags,$(m-c-flags)),'$(flag)', ) \

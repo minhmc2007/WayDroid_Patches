@@ -10,37 +10,62 @@ re-adding its own forks at the same paths, and then `git am`ing
 LineageOS merge becomes a manual fork rebase, and it is impossible to see what
 WayDroid actually changes relative to the ROM you started from.
 
-This repo does the same job without replacing anything:
+This repo does the same job without replacing anything LineageOS maintains:
 
 * Anything the LineageOS manifest already provides is **kept as the LineageOS
   checkout and patched**. `frameworks/base`, `frameworks/av`, `frameworks/native`,
   `hardware/interfaces`, `system/core`, `system/vold`, `lineage-sdk` and the rest
   are never removed from the manifest and never re-pointed at a fork.
 * Only repos that **do not exist in LineageOS at all** are added to the manifest.
-* The handful of AOSP-remote display/media/rust projects that upstream swaps out
-  are opt-in, and are the only place a `remove-project` can appear.
+* The AOSP-remote display/media/rust projects that upstream swaps out are
+  swapped here too, because the build genuinely does not link without them.
+
+## Host requirements
+
+Build host packages are **not** vendored here. Install them yourself:
+
+```shell
+sudo pacman -S --needed \
+    bc bison flex gperf g++-multilib gcc-multilib git-lfs gnupg imagemagick \
+    lzop pngcrush rsync schedtool squashfs-tools xsltproc zip \
+    python-setuptools python-mako python-yaml \
+    openjdk-17-jdk
+```
+
+`python-mako` in particular is a hard requirement and its absence fails mesa
+late in the vendor image build:
+
+```
+meson.build:1130:2: ERROR: Problem encountered:
+Python (3.x) mako module >= 0.8.0 required to build mesa.
+```
+
+The Python *version* is not the problem there: any Python 3.x works as long as
+the `mako` module is importable. mesa probes `mako.__version__` and compares it
+to 0.8.0.
 
 ## Layout
 
     waydroid-patches.sh            the entry point
     manifest/
       00-remotes.xml               the ghub remote
-      10-waydroid-projects.xml     pure addition, 21 projects, zero remove-project
-      20-aosp-swaps.xml            opt-in AOSP swaps, the only remove-project
+      10-waydroid-projects.xml     pure addition, zero remove-project
+      20-aosp-swaps.xml            the AOSP display/media swaps
     base-patches-36/
-      10-lineage-forks/            generated: the WayDroid fork deltas
-      20-upstream/                 vendored: upstream's hand-written base-patches-36
-        roms-patches/              upstream conflict resolutions, used as a fallback
+      10-lineage-forks/            generated fork deltas + our own build fixes
+      20-upstream/                 upstream's hand-written base-patches-36
+        roms-patches/              upstream conflict resolutions, used as fallback
     tools/
-      gen-fork-patches.sh          regenerate 10-lineage-forks
+      gen-fork-patches.sh          regenerate the generated fork deltas
       track-upstream.py            how far the forks have moved (GitHub compare API)
+      check-dup-modules.py         preflight for duplicate Soong module names
       xml-paths.py                 manifest fragment inspector
     TRACKING.md                    last tracking report
 
 ## Usage
 
 ```shell
-# 1. add the manifest fragments and sync the 21 extra projects
+# 1. add the manifest fragments and sync the extra projects
 ./waydroid-patches.sh manifest /path/to/LineageOS
 
 # 2. layer the patches (syncs first if the added projects are missing)
@@ -56,9 +81,17 @@ This repo does the same job without replacing anything:
 
 `apply` is idempotent, so it is safe to re-run after a `repo sync`. It reports
 each patch as `applied`, `already` or `conflict`, and exits non-zero if anything
-conflicted. It also syncs on its own: several patches live in projects that only
-exist because of our manifest (`external/llvm-project`, `vendor/intel/*`), and it
-runs `repo sync -c -j$(nproc --all)` when any of them is missing from the tree.
+conflicted. It also syncs on its own, because several patches live in projects
+that only exist because of our manifest.
+
+`revert` and `apply` are a cheap on/off toggle: `revert` resets the patched
+projects and drops the tags, but leaves the manifest and the added projects
+alone, so re-applying needs no re-sync. Full teardown is explicit:
+
+```shell
+./waydroid-patches.sh revert <src> --yes --uninstall
+./waydroid-patches.sh revert <src> --yes --purge-projects
+```
 
 The source directory may be relative or absolute; it is resolved before use.
 
@@ -70,48 +103,54 @@ The source directory may be relative or absolute; it is resolved before use.
 --dry-run, -n         apply: report the verdict, change nothing
 --layer <name>        apply: one layer only (10-lineage-forks | 20-upstream)
 --only <project>      apply: repeatable, restrict to these projects
---with-aosp-swaps     manifest: also install the 7 remove-project AOSP swaps
+--no-aosp-swaps       manifest: strict pure-add manifest
 --yes, -y             revert: actually do it
---keep-manifest       revert: keep the local_manifests fragments
---keep-projects       revert: keep the added project directories
+--uninstall           revert: also remove the manifest fragments
+--purge-projects      revert: also delete the added project directories
 ```
 
 ## The two layers
 
-`10-lineage-forks` is generated, not hand-written. For each project that has a
-WayDroid fork, `tools/gen-fork-patches.sh` fetches the fork and runs
+`10-lineage-forks` is mostly generated. For each project that has a WayDroid
+fork, `tools/gen-fork-patches.sh` fetches the fork and runs
 `git format-patch merge-base..fork-tip`. Because the base is the merge-base and
-not the LineageOS tip, the resulting series contains **only** the WayDroid
-commits and never a LineageOS commit. This also means a fork that has diverged
-is handled: `lineage-sdk` is 2 LineageOS commits behind its fork, and those two
-commits are simply left alone in the checkout.
+not the LineageOS tip, the series contains **only** the WayDroid commits and
+never a LineageOS commit. A diverged fork is handled too: `lineage-sdk` is 2
+LineageOS commits behind its fork, and those two are left alone in the checkout.
 
-The current forks sit cleanly ahead of `lineage-23.2`, so the deltas are small:
+The layer also holds our own hand-written build fixes, listed in
+`docs/build-fixes.md`. Those exist because a few upstream projects have drifted
+past what LineageOS 23.2 provides, and because upstream's `base-patches-36` was
+authored against its own forks rather than against LineageOS trees that have
+moved since.
 
-| project | commits | files |
-|---|---|---|
-| frameworks/av | 29 | 56 |
-| frameworks/base | 22 | 35 |
-| frameworks/native | 26 | 53 |
-| system/core | 33 | 25 |
-| hardware/interfaces | 10 | 15 |
-| lineage-sdk | 12 | 20 |
-| system/vold | 8 | 6 |
+`20-upstream` is upstream's `base-patches-36` vendored verbatim, minus the two
+`vendor/intel/gmmlib` patches, plus the `roms-patches` fallbacks. The
+`20-upstream` layer is applied **after** `10-lineage-forks`, because those
+patches were written against the forks.
 
-`20-upstream` is upstream's `base-patches-36` vendored verbatim, plus the
-`roms-patches` fallbacks. These carry the hand-written WayDroid behaviour (SELinux
-relaxations, vold and linkerconfig fixes, lmkd, bionic text relocations) and were
-written against the forks, so they are applied **after** `10-lineage-forks`.
+`packages/apps/TvSettings` is deliberately absent: the fork is 4 commits
+*behind* LineageOS and has nothing we lack, and it is an ATV-only app that a
+phone build does not use.
 
-`10-lineage-forks` also carries a small number of hand-written compatibility
-patches that are not fork deltas, currently just `external/rust/hbm`: its
-`refs/heads/main` has drifted to referencing `libash_latest_rust`, which no
-project in a 23.2 tree defines, so the patch renames it to the `libash_rust`
-that android-crates-io actually provides.
+## Deviation from upstream: gmmlib
 
-`packages/apps/TvSettings` is deliberately absent from both layers: the fork is
-4 commits *behind* LineageOS and has nothing we lack, and it is an ATV-only app
-that a phone build does not use.
+Upstream removes `platform/external/gmmlib` and adds `intel/gmmlib` at
+`vendor/intel/gmmlib`. That duplicates the project, and both trees declare
+`external_gmmlib_license`, `libigdgmm_android` and `libigdgmm_headers` with no
+`soong_namespace`, so bootstrap fails:
+
+```
+error: external/gmmlib/Android.bp:25:1: module "external_gmmlib_license"
+       already defined
+```
+
+LineageOS's own `external/gmmlib` is used instead, unpatched. Its two upstream
+patches are both unnecessary there: `0002` adds x86 to an `arch` block that
+already has it, and `0001` adds `GmmXe3P_XPCCachePolicy.cpp`, a file that only
+exists in intel's `intel-gmmlib-22.10.0` snapshot.
+
+`tools/check-dup-modules.py` is the preflight for this whole class of mistake.
 
 ## The AOSP swaps, and why `remove-project` is unavoidable there
 
@@ -124,43 +163,57 @@ upstream repository:
   keeps the original project **name**, so the fetch URL becomes
   `<fetch>/platform/external/mesa3d` rather than the WayDroid fork.
 
-So swapping `platform/external/mesa3d` for `WayDroid-ATV/android_external_mesa3d`
-is only expressible as `remove-project` + `project`, exactly as upstream does it.
-These seven are all AOSP-remote display/media/rust trees that LineageOS does not
-maintain and no custom ROM touches, so they are quarantined in
-`manifest/20-aosp-swaps.xml` and only installed on request:
+So swapping `platform/external/mesa3d` for
+`WayDroid-ATV/android_external_mesa3d` is only expressible as
+`remove-project` + `project`, exactly as upstream does it. These seven are all
+AOSP-remote display/media/rust trees that LineageOS does not maintain and no
+custom ROM touches, and the build does not link without them: ffmpeg's 32-bit
+variant needs `libva` for `android-x86`, and LineageOS's `external/libva` only
+enables `x86_64`.
 
-They are installed by default, because the build genuinely needs them: ffmpeg's
-32-bit variant requires `libva` for `android-x86`, and LineageOS's
-`external/libva` only enables `x86_64`, so without the swap kati fails with
-`libavcodec (SHARED_LIBRARIES android-x86) missing libva`. Pass
-`--no-aosp-swaps` to install the strict pure-add manifest instead.
+Because a swap replaces the local work tree, `manifest` runs
+`repo sync --force-sync` scoped to exactly those seven **before** the normal
+sync, since a plain `repo sync` also fails while those stale work trees are
+present. `apply` re-applies the patches that force-sync discards.
 
-Swapping replaces the local work tree of those projects, so `manifest` runs
-`repo sync --force-sync` scoped to exactly those seven before the normal sync.
-That discards the patches on them, so re-run `apply` afterwards.
-
-`external/rust/android-crates-io` is also left as the LineageOS copy. LineageOS
-already pins the `android-16.0.0_r4` tag, which is what SDK 36 wants, and a
-commented-out swap is left in `20-aosp-swaps.xml` for the day a build needs it.
+Pass `--no-aosp-swaps` to install the strict pure-add manifest instead.
 
 ## Tracking upstream
 
 ```shell
 python3 tools/track-upstream.py            # human readable, same output as TRACKING.md
 python3 tools/track-upstream.py --regenerate
+tools/gen-fork-patches.sh <los-root> "$PWD/base-patches-36/10-lineage-forks" frameworks/base
 ```
 
 The GitHub compare API reports `ahead_by`/`behind_by` per fork. If `ahead` ever
-stops matching the number of patches on disk, regenerate that project:
+stops matching the number of patches on disk, regenerate that project.
+
+## Building
+
+Not driven by this repo. In an envsetup'd shell:
 
 ```shell
-tools/gen-fork-patches.sh /path/to/LineageOS "$PWD/base-patches-36/10-lineage-forks" frameworks/base
+lunch lineage_waydroid_x86_64-bp4a-userdebug
+mka systemimage
+mka vendorimage
 ```
+
+Two environment caveats:
+
+* `repo` keeps a JSON cache beside whatever gitconfig it reads. If your
+  `~/.gitconfig` is newer than `~/.repo_.gitconfig.json`, `repo` tries to rewrite
+  the cache, and soong mounts `$HOME` read-only for the build, so the
+  `build-manifest.xml` rule dies with `Read-only file system`. Fix it by running
+  `repo manifest -o /dev/null` once **outside** a build to refresh the cache.
+* 15 GB of RAM is below what kati wants; it was `SIGKILL`ed at "finishing Make
+  module rules". A large swap file helps but does not remove the need for RAM.
 
 ## Provenance
 
-`20-upstream/` is a verbatim copy of `waydroid-patches/base-patches-36` and
-`roms-patches` from [WayDroid-ATV/android_vendor_waydroid](https://github.com/WayDroid-ATV/android_vendor_waydroid)
+`20-upstream/` is a verbatim copy of `waydroid-patches/base-patches-36` and the
+`roms-patches` fallbacks from
+[WayDroid-ATV/android_vendor_waydroid](https://github.com/WayDroid-ATV/android_vendor_waydroid)
 (branch `lineage-23.2`), which is licensed GPL-3.0. `10-lineage-forks/` is
-generated from those same upstream commits, so it inherits the same licence.
+generated from those same upstream commits and the hand-written fixes above, so
+it inherits the same licence. See `LICENSE-NOTES.md`.
