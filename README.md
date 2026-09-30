@@ -29,19 +29,26 @@ sudo pacman -S --needed \
     bc bison flex gperf g++-multilib gcc-multilib git-lfs gnupg imagemagick \
     lzop pngcrush rsync schedtool squashfs-tools xsltproc zip \
     python-setuptools python-mako python-yaml \
-    cbindgen \
+    cbindgen clang \
     openjdk-17-jdk
 ```
 
-Two of these are *not* in AOSP's documented list, because upstream's
-`base-patches-36` does not list them either. Both fail the vendor image build
-late, after several minutes of compiling, and the error names the missing
-program rather than anything to do with WayDroid:
+Three of these are *not* in AOSP's documented list, because upstream's
+`base-patches-36` does not list them either. All three fail the vendor image
+build late, after several minutes of compiling, and each error names the missing
+program or library rather than anything to do with WayDroid:
 
 | package | error | why |
 |---|---|---|
 | `python-mako` | `ERROR: Problem encountered: Python (3.x) mako module >= 0.8.0 required to build mesa.` | mesa needs it to generate its glsl builtins |
 | `cbindgen` | `src/nouveau/nil/meson.build:3:16: ERROR: Program 'cbindgen' not found or not executable` | nouveau's NIL driver needs it to bind Rust to C |
+| `clang` | `panicked at external/rust/android-crates-io/crates/bindgen/lib.rs:616:27: Unable to find libclang: "couldn't find any valid shared libraries matching: ['libclang.so', ...]"` | cbindgen dlopens libclang to parse headers |
+
+The `clang` one is the least obvious, because the panic is raised inside a
+vendored crate in the tree rather than by a missing executable, so it reads like
+a source bug. It is only a runtime dependency of the `cbindgen` binary. If
+`LIBCLANG_PATH` is set in the environment, cbindgen honours it and the package
+is not needed.
 
 Note on the mako error: it is a *missing module*, not a Python version problem.
 Any Python 3.x works once `mako` is importable, because mesa probes
