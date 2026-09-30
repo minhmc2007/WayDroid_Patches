@@ -23,11 +23,11 @@ instead of importing a newer ash.
 This costs hbm's Vulkan/DRM host buffer manager, so a future ash 0.38+
 crate is needed if that path is wanted.
 ---
- Android.bp | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Android.bp | 22 ++++++++++++++--------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
 
 diff --git a/Android.bp b/Android.bp
-index 2e7b7a7..fea8809 100644
+index 2e7b7a7..1d61d9f 100644
 --- a/Android.bp
 +++ b/Android.bp
 @@ -23,6 +23,12 @@ rust_library {
@@ -52,3 +52,25 @@ index 2e7b7a7..fea8809 100644
  }
  
  rust_ffi_static {
+@@ -76,15 +84,13 @@ cc_library_shared {
+     vendor: true,
+     shared_libs: ["liblog"],
+     export_include_dirs: ["hbm-minigbm/include"],
++    // The arch block this used to carry re-enabled the module on x86 and
++    // x86_64, which overrode the enabled: false above and left it depending on
++    // the now-disabled libhbm_minigbm_rust:
++    //   error: module "libhbm_minigbm" variant "android_vendor_x86_64_shared":
++    //     depends on disabled module "libhbm_minigbm_rust"
++    // Removed so the module actually stays disabled.
+     enabled: false,
+-    arch: {
+-        x86: {
+-            enabled: true,
+-        },
+-        x86_64: {
+-            enabled: true,
+-        },
+-    }
+ }
+ 
+ cc_library_shared {
