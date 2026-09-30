@@ -106,6 +106,8 @@ python3 tools/check-dup-modules.py <src> --ours manifest/10-waydroid-projects.xm
 tools/gen-fork-patches.sh <los-root> "$PWD/base-patches-36/10-lineage-forks" frameworks/base
 ```
 
+`docs/tools.md` explains what each does and why it works the way it does.
+
 ## Building
 
 Not driven by this repo. In an envsetup'd shell:
@@ -126,7 +128,8 @@ Two environment gotchas:
 * 15 GB of RAM is under what kati wants; it was `SIGKILL`ed at "finishing Make
   module rules". A big swap file helps but does not remove the need for RAM.
 
-See `docs/build-fixes.md` for the six hand-written patches in `15-ours`,
+`docs/tools.md` covers the tooling. `docs/build-fixes.md` covers the six
+hand-written patches in `15-ours`,
 including the mesa-tools `libxml2.so.2` soname alias, which is an alias and not
 the library LLVM 20 was built against.
 
