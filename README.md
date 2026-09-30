@@ -29,8 +29,32 @@ sudo pacman -S --needed \
     bc bison flex gperf g++-multilib gcc-multilib git-lfs gnupg imagemagick \
     lzop pngcrush rsync schedtool squashfs-tools xsltproc zip \
     python-setuptools python-mako python-yaml \
-    cbindgen clang \
+    cbindgen clang lib32-glibc \
     openjdk-17-jdk
+```
+
+`gcc-multilib` pulls in `lib32-glibc` on most setups, but install it
+explicitly: cbindgen runs the *host* clang to parse libva's headers, and that
+reaches `/usr/include/gnu/stubs.h`, which needs the 32-bit `stubs-32.h` that
+only `lib32-glibc` ships. The symptom is a 32-bit x86 compile that looks like a
+missing header in the middle of mesa's build:
+
+```
+/usr/include/gnu/stubs.h:7:11: fatal error: 'gnu/stubs-32.h' file not found
+Unable to generate bindings: clang diagnosed error
+```
+
+Checking the whole set at once, rather than discovering one per 20-minute
+build:
+
+```shell
+for f in /usr/include/gnu/stubs-32.h /usr/lib32/libc.so /usr/lib32/libstdc++.so \
+         /usr/lib/libxml2.so.16 /usr/bin/cbindgen; do
+  printf '%-40s %s\n' "$f" "$([ -e "$f" ] && echo ok || echo MISSING)"
+done
+python3 -c "import mako" 2>/dev/null && echo "mako ok" || echo "mako MISSING"
+rustup target list --installed | grep -q android && echo "rust android target ok" \
+  || echo "rust android target MISSING"
 ```
 
 Three of these are *not* in AOSP's documented list, because upstream's
@@ -57,6 +81,26 @@ rustup target add x86_64-linux-android
 Confirm with `rustup target list --installed`, which should list
 `x86_64-linux-android` alongside `x86_64-unknown-linux-gnu`. The Arch
 `rust` package ships the host target only.
+
+## mesa-tools: the libxml2 soname
+
+`prebuilts/mesa-tools/root/lib64/libLLVM.so.20.1` is linked against
+`libxml2.so.2`, the soname of libxml2 2.9, but the prebuilt ships no
+libxml2 in `root/lib64` and the `mesa_clc` wrapper puts only that
+directory on `LD_LIBRARY_PATH`. Arch has libxml2 2.15, soname
+`libxml2.so.16`, so the shader compiler fails to load:
+
+```
+root/bin/mesa_clc: error while loading shared libraries:
+libxml2.so.2: cannot open shared object file
+```
+
+Fixed by
+`10-lineage-forks/prebuilts/mesa-tools/0001-*.patch`, which symlinks the
+newer soname to the old name. That is a soname alias, not the library
+LLVM 20 was built against: shader compilation works, but a mesa path
+needing a real libxml2 2.9 ABI symbol would still fail, and the proper
+fix there is to bundle `libxml2.so.2` into `root/lib64`.
 
 The `clang` one is the least obvious, because the panic is raised inside a
 vendored crate in the tree rather than by a missing executable, so it reads like
