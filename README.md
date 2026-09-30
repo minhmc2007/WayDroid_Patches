@@ -44,6 +44,20 @@ program or library rather than anything to do with WayDroid:
 | `cbindgen` | `src/nouveau/nil/meson.build:3:16: ERROR: Program 'cbindgen' not found or not executable` | nouveau's NIL driver needs it to bind Rust to C |
 | `clang` | `panicked at external/rust/android-crates-io/crates/bindgen/lib.rs:616:27: Unable to find libclang: "couldn't find any valid shared libraries matching: ['libclang.so', ...]"` | cbindgen dlopens libclang to parse headers |
 
+### Rust target
+
+mesa cross-compiles its Rust subprojects, and the meson cross file targets
+`x86_64-linux-android`. A rustup-managed toolchain needs that target
+explicitly, or the build dies partway through the Rust sources:
+
+```shell
+rustup target add x86_64-linux-android
+```
+
+Confirm with `rustup target list --installed`, which should list
+`x86_64-linux-android` alongside `x86_64-unknown-linux-gnu`. The Arch
+`rust` package ships the host target only.
+
 The `clang` one is the least obvious, because the panic is raised inside a
 vendored crate in the tree rather than by a missing executable, so it reads like
 a source bug. It is only a runtime dependency of the `cbindgen` binary. If
