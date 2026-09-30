@@ -49,7 +49,7 @@ PATCH_ROOT="$SCRIPT_DIR/base-patches-36"
 MANIFEST_DIR="$SCRIPT_DIR/manifest"
 
 # Applied in this order; upstream's roms-patches act as conflict-resolution hints.
-LAYERS=("10-lineage-forks" "20-upstream")
+LAYERS=("10-lineage-forks" "15-ours" "20-upstream")
 FALLBACK_DIR="$PATCH_ROOT/20-upstream/roms-patches"
 
 CONFLICT_DIR="$SCRIPT_DIR/.conflicts"

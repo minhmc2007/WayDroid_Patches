@@ -1,8 +1,9 @@
-# Build fixes in `10-lineage-forks`
+# Build fixes in `15-ours`
 
-These are not generated fork deltas. They are hand-written patches against
-upstream projects that have drifted past what LineageOS 23.2 / SDK 36 provides,
-or that upstream ships without a LineageOS-side fix.
+These live in layer `15-ours`, under Apache-2.0, deliberately kept apart from
+the GPL-3.0 fork deltas. They are hand-written patches against projects that
+have drifted past what LineageOS 23.2 provides, or that ship without a
+LineageOS-side fix.
 
 Each one was made only after a build failed, and each commit message quotes the
 actual error.
@@ -70,8 +71,8 @@ a pointer.
 
 ## Regenerating
 
-The generated fork deltas and the hand-written fixes live in the same layer, so
-when regenerating, keep the hand-written ones:
+The generated fork deltas are in `10-lineage-forks` and these are in `15-ours`,
+so each keeps its own licence and regenerating one does not disturb the other.
 
 ```shell
 tools/gen-fork-patches.sh <los-root> "$PWD/base-patches-36/10-lineage-forks" frameworks/base
