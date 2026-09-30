@@ -1,0 +1,68 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Wed, 30 Sep 2026 12:25:17 +0700
+Subject: [PATCH] minigbm: drop the hbm dependency, hbm is disabled
+
+  error: external/minigbm/Android.bp:284:1: module
+  "libminigbm_gralloc_intel" variant "android_vendor_x86_64_shared":
+  depends on disabled module "libhbm_minigbm"
+  error: external/minigbm/Android.bp:231:1: module "libminigbm_gralloc"
+  variant "android_vendor_x86_64_shared": depends on disabled module
+  "libhbm_minigbm"
+
+minigbm_cros_gralloc_defaults added shared_libs: ["libhbm_minigbm"]
+for x86 and x86_64, and libminigbm_gralloc passed -DDRV_HBM_HELPER on
+both. hbm needs ash 0.38+ and this tree has 0.37.3, so every hbm module
+is disabled, and soong refuses a live module that depends on a disabled
+one.
+
+Both the shared_libs entries and the cflags go, since the flag is what
+selects the HBM helper code that needed the library. minigbm was the
+only consumer of hbm anywhere in the tree.
+---
+ Android.bp | 18 ++++++++----------
+ 1 file changed, 8 insertions(+), 10 deletions(-)
+
+diff --git a/Android.bp b/Android.bp
+index be861f3..8ba40c0 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -127,14 +127,14 @@ cc_defaults {
+         "liblog",
+         "android.hardware.graphics.common-V7-ndk",
+     ],
+-    arch: {
+-        x86: {
+-            shared_libs: ["libhbm_minigbm"],
+-        },
+-        x86_64: {
+-            shared_libs: ["libhbm_minigbm"],
+-        },
+-    },
++    // The x86/x86_64 shared_libs: ["libhbm_minigbm"] that used to be here is
++    // gone. hbm needs ash 0.38+ and this tree has ash 0.37.3, so the hbm
++    // modules are disabled, and soong rejects a live module that depends on a
++    // disabled one:
++    //   error: module "libminigbm_gralloc" variant "android_vendor_x86_64_shared":
++    //     depends on disabled module "libhbm_minigbm"
++    // The matching -DDRV_HBM_HELPER cflags on libminigbm_gralloc are removed by
++    // the same patch, since the HBM helper code they select is what needed it.
+ }
+ 
+ cc_defaults {
+@@ -242,7 +242,6 @@ cc_library_shared {
+             cflags: [
+                 "-DHAS_DMABUF_SYSTEM_HEAP",
+                 "-DDRV_AMDGPU",
+-                "-DDRV_HBM_HELPER",
+                 "-DDRV_I915",
+                 "-DDRV_NOUVEAU",
+                 "-DDRV_VMWGFX",
+@@ -253,7 +252,6 @@ cc_library_shared {
+             cflags: [
+                 "-DHAS_DMABUF_SYSTEM_HEAP",
+                 "-DDRV_AMDGPU",
+-                "-DDRV_HBM_HELPER",
+                 "-DDRV_I915",
+                 "-DDRV_NOUVEAU",
+                 "-DDRV_VMWGFX",
