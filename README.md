@@ -1,262 +1,108 @@
 # WayDroid ATV on LineageOS 23.2 — as patches, not forks
 
-Target: **LineageOS 23.2 / SDK 36, phone build** (not Android TV).
-Branch of this repo: `lineage-23.2`.
+Branch `lineage-23.2`. Phone build, not Android TV.
 
-Upstream [WayDroid-ATV](https://github.com/WayDroid-ATV) gets its changes in by
-`remove-project`ing roughly fifteen LineageOS projects from the manifest,
-re-adding its own forks at the same paths, and then `git am`ing
-`base-patches-36` on top of the fork. The result works, but every subsequent
-LineageOS merge becomes a manual fork rebase, and it is impossible to see what
-WayDroid actually changes relative to the ROM you started from.
+Upstream [WayDroid-ATV](https://github.com/WayDroid-ATV) `remove-project`s ~15
+LineageOS projects and re-adds its own forks at the same paths, so every later
+LineageOS merge is a manual fork rebase. This repo keeps the LineageOS
+checkout and layers patches on top instead. Nothing LineageOS maintains is ever
+removed or re-pointed.
 
-This repo does the same job without replacing anything LineageOS maintains:
-
-* Anything the LineageOS manifest already provides is **kept as the LineageOS
-  checkout and patched**. `frameworks/base`, `frameworks/av`, `frameworks/native`,
-  `hardware/interfaces`, `system/core`, `system/vold`, `lineage-sdk` and the rest
-  are never removed from the manifest and never re-pointed at a fork.
-* Only repos that **do not exist in LineageOS at all** are added to the manifest.
-* The AOSP-remote display/media/rust projects that upstream swaps out are
-  swapped here too, because the build genuinely does not link without them.
-
-## Host requirements
-
-Build host packages are **not** vendored here. Install them yourself:
+## Host prerequisites
 
 ```shell
 sudo pacman -S --needed \
     bc bison flex gperf g++-multilib gcc-multilib git-lfs gnupg imagemagick \
     lzop pngcrush rsync schedtool squashfs-tools xsltproc zip \
-    python-setuptools python-mako python-yaml \
-    cbindgen clang lib32-glibc \
+    python-setuptools python-mako python-yaml cbindgen clang lib32-glibc \
     openjdk-17-jdk
-```
-
-`gcc-multilib` pulls in `lib32-glibc` on most setups, but install it
-explicitly: cbindgen runs the *host* clang to parse libva's headers, and that
-reaches `/usr/include/gnu/stubs.h`, which needs the 32-bit `stubs-32.h` that
-only `lib32-glibc` ships. The symptom is a 32-bit x86 compile that looks like a
-missing header in the middle of mesa's build:
-
-```
-/usr/include/gnu/stubs.h:7:11: fatal error: 'gnu/stubs-32.h' file not found
-Unable to generate bindings: clang diagnosed error
-```
-
-Checking the whole set at once, rather than discovering one per 20-minute
-build:
-
-```shell
-for f in /usr/include/gnu/stubs-32.h /usr/lib32/libc.so /usr/lib32/libstdc++.so \
-         /usr/lib/libxml2.so.16 /usr/bin/cbindgen; do
-  printf '%-40s %s\n' "$f" "$([ -e "$f" ] && echo ok || echo MISSING)"
-done
-python3 -c "import mako" 2>/dev/null && echo "mako ok" || echo "mako MISSING"
-rustup target list --installed | grep -q android && echo "rust android target ok" \
-  || echo "rust android target MISSING"
-```
-
-Three of these are *not* in AOSP's documented list, because upstream's
-`base-patches-36` does not list them either. All three fail the vendor image
-build late, after several minutes of compiling, and each error names the missing
-program or library rather than anything to do with WayDroid:
-
-| package | error | why |
-|---|---|---|
-| `python-mako` | `ERROR: Problem encountered: Python (3.x) mako module >= 0.8.0 required to build mesa.` | mesa needs it to generate its glsl builtins |
-| `cbindgen` | `src/nouveau/nil/meson.build:3:16: ERROR: Program 'cbindgen' not found or not executable` | nouveau's NIL driver needs it to bind Rust to C |
-| `clang` | `panicked at external/rust/android-crates-io/crates/bindgen/lib.rs:616:27: Unable to find libclang: "couldn't find any valid shared libraries matching: ['libclang.so', ...]"` | cbindgen dlopens libclang to parse headers |
-
-### Rust target
-
-mesa cross-compiles its Rust subprojects, and the meson cross file targets
-`x86_64-linux-android`. A rustup-managed toolchain needs that target
-explicitly, or the build dies partway through the Rust sources:
-
-```shell
 rustup target add x86_64-linux-android
 ```
 
-Confirm with `rustup target list --installed`, which should list
-`x86_64-linux-android` alongside `x86_64-unknown-linux-gnu`. The Arch
-`rust` package ships the host target only.
+`python-mako`, `cbindgen`, `clang` and `lib32-glibc` are the four that bite.
+Each fails mesa late, naming a program or a library rather than anything to do
+with Waydroid:
 
-## mesa-tools: the libxml2 soname
+| missing | error |
+|---|---|
+| `python-mako` | `ERROR: ... Python (3.x) mako module >= 0.8.0 required to build mesa.` |
+| `cbindgen` | `src/nouveau/nil/meson.build:3:16: ERROR: Program 'cbindgen' not found or not executable` |
+| `clang` | `bindgen/lib.rs:616: Unable to find libclang: couldn't find any valid shared libraries matching: ['libclang.so', ...]` |
+| `lib32-glibc` | `/usr/include/gnu/stubs.h:7:11: fatal error: 'gnu/stubs-32.h' file not found` |
 
-`prebuilts/mesa-tools/root/lib64/libLLVM.so.20.1` is linked against
-`libxml2.so.2`, the soname of libxml2 2.9, but the prebuilt ships no
-libxml2 in `root/lib64` and the `mesa_clc` wrapper puts only that
-directory on `LD_LIBRARY_PATH`. Arch has libxml2 2.15, soname
-`libxml2.so.16`, so the shader compiler fails to load:
+The `clang` one reads like a source bug, because the panic is raised inside a
+vendored crate. It is only a runtime dep of the `cbindgen` binary.
 
+Check everything at once instead of one per build:
+
+```shell
+for f in /usr/include/gnu/stubs-32.h /usr/lib32/libc.so /usr/bin/cbindgen \
+         /usr/lib/libxml2.so.16; do
+  printf '%-40s %s\n' "$f" "$([ -e "$f" ] && echo ok || echo MISSING)"
+done
+python3 -c "import mako" && echo "mako ok" || echo "mako MISSING"
+rustup target list --installed | grep -q android && echo "rust ok" || echo "rust MISSING"
 ```
-root/bin/mesa_clc: error while loading shared libraries:
-libxml2.so.2: cannot open shared object file
-```
-
-Fixed by
-`10-lineage-forks/prebuilts/mesa-tools/0001-*.patch`, which symlinks the
-newer soname to the old name. That is a soname alias, not the library
-LLVM 20 was built against: shader compilation works, but a mesa path
-needing a real libxml2 2.9 ABI symbol would still fail, and the proper
-fix there is to bundle `libxml2.so.2` into `root/lib64`.
-
-The `clang` one is the least obvious, because the panic is raised inside a
-vendored crate in the tree rather than by a missing executable, so it reads like
-a source bug. It is only a runtime dependency of the `cbindgen` binary. If
-`LIBCLANG_PATH` is set in the environment, cbindgen honours it and the package
-is not needed.
-
-Note on the mako error: it is a *missing module*, not a Python version problem.
-Any Python 3.x works once `mako` is importable, because mesa probes
-`mako.__version__` and compares it against 0.8.0. The same error text appears
-for both cases.
-
-## Layout
-
-    waydroid-patches.sh            the entry point
-    manifest/
-      00-remotes.xml               the ghub remote
-      10-waydroid-projects.xml     pure addition, zero remove-project
-      20-aosp-swaps.xml            the AOSP display/media swaps
-    base-patches-36/
-      10-lineage-forks/            generated fork deltas + our own build fixes
-      20-upstream/                 upstream's hand-written base-patches-36
-        roms-patches/              upstream conflict resolutions, used as fallback
-    tools/
-      gen-fork-patches.sh          regenerate the generated fork deltas
-      track-upstream.py            how far the forks have moved (GitHub compare API)
-      check-dup-modules.py         preflight for duplicate Soong module names
-      xml-paths.py                 manifest fragment inspector
-    TRACKING.md                    last tracking report
 
 ## Usage
 
 ```shell
-# 1. add the manifest fragments and sync the extra projects
-./waydroid-patches.sh manifest /path/to/LineageOS
-
-# 2. layer the patches (syncs first if the added projects are missing)
-./waydroid-patches.sh apply /path/to/LineageOS
-
-# check state
-./waydroid-patches.sh status /path/to/LineageOS
-
-# undo everything: patches, manifest fragments, added project dirs
-./waydroid-patches.sh revert /path/to/LineageOS          # plan only
-./waydroid-patches.sh revert /path/to/LineageOS --yes    # do it
+./waydroid-patches.sh manifest /path/to/LineageOS   # add fragments, sync
+./waydroid-patches.sh apply    /path/to/LineageOS   # layer the patches
+./waydroid-patches.sh status   /path/to/LineageOS
+./waydroid-patches.sh revert   /path/to/LineageOS   # plan only
+./waydroid-patches.sh revert   /path/to/LineageOS --yes
 ```
 
-`apply` is idempotent, so it is safe to re-run after a `repo sync`. It reports
-each patch as `applied`, `already` or `conflict`, and exits non-zero if anything
-conflicted. It also syncs on its own, because several patches live in projects
-that only exist because of our manifest.
+`apply` is idempotent and syncs by itself, so re-run it after any `repo sync`.
+Source dir may be relative.
 
-`revert` and `apply` are a cheap on/off toggle: `revert` resets the patched
-projects and drops the tags, but leaves the manifest and the added projects
-alone, so re-applying needs no re-sync. Full teardown is explicit:
+`revert` resets the patched projects and drops tags but leaves the manifest and
+added projects, so re-applying needs no re-sync. Teardown is explicit:
+`--uninstall` (fragments) or `--purge-projects` (also the added dirs).
+
+Options: `-j <n>`, `--no-sync`, `--dry-run`, `--layer <name>`, `--only <project>`,
+`--no-aosp-swaps`, `--uninstall`, `--purge-projects`.
+
+## Layers
+
+`10-lineage-forks` — generated by `tools/gen-fork-patches.sh` as
+`format-patch merge-base..fork-tip`, so it holds **only** Waydroid commits and
+never a LineageOS one. A diverged fork is fine: `lineage-sdk` is 2 LineageOS
+commits behind, and those stay untouched. Also holds six hand-written build
+fixes, in `docs/build-fixes.md`.
+
+`20-upstream` — upstream's `base-patches-36` verbatim (minus two gmmlib patches,
+see below) plus the `roms-patches` conflict fallbacks. Written against the
+forks, so it goes **after** layer 10.
+
+`packages/apps/TvSettings` is absent on purpose: the fork is 4 commits *behind*
+LineageOS and has nothing we lack, and a phone build does not use it.
+
+## Deviations from upstream
+
+**gmmlib.** Upstream removes `platform/external/gmmlib` and adds `intel/gmmlib`
+at `vendor/intel/gmmlib`. Both declare `libigdgmm_android` and friends with no
+`soong_namespace`, so bootstrap dies with `module already defined`. LineageOS's
+own copy is used unpatched; its two upstream patches are both no-ops there.
+`tools/check-dup-modules.py` is the preflight for this class of bug.
+
+**AOSP swaps.** `repo` cannot point an existing project at a different upstream:
+`<project path="X">` is `duplicate path`, and `<extend-project>` keeps the
+original project *name*. So swapping is only expressible as
+`remove-project` + `project`. These seven are AOSP-remote display/media/rust
+trees LineageOS does not maintain, and the build does not link without them —
+ffmpeg's 32-bit variant needs `libva` for `android-x86`, and LineageOS's
+`external/libva` only enables `x86_64`. They are the only `remove-project` in
+this repo. `--no-aosp-swaps` for the strict pure-add manifest.
+
+## Tools
 
 ```shell
-./waydroid-patches.sh revert <src> --yes --uninstall
-./waydroid-patches.sh revert <src> --yes --purge-projects
-```
-
-The source directory may be relative or absolute; it is resolved before use.
-
-## Options
-
-```shell
--j <n>                parallelism for repo sync (default: nproc --all)
---no-sync             never run repo sync
---dry-run, -n         apply: report the verdict, change nothing
---layer <name>        apply: one layer only (10-lineage-forks | 20-upstream)
---only <project>      apply: repeatable, restrict to these projects
---no-aosp-swaps       manifest: strict pure-add manifest
---yes, -y             revert: actually do it
---uninstall           revert: also remove the manifest fragments
---purge-projects      revert: also delete the added project directories
-```
-
-## The two layers
-
-`10-lineage-forks` is mostly generated. For each project that has a WayDroid
-fork, `tools/gen-fork-patches.sh` fetches the fork and runs
-`git format-patch merge-base..fork-tip`. Because the base is the merge-base and
-not the LineageOS tip, the series contains **only** the WayDroid commits and
-never a LineageOS commit. A diverged fork is handled too: `lineage-sdk` is 2
-LineageOS commits behind its fork, and those two are left alone in the checkout.
-
-The layer also holds our own hand-written build fixes, listed in
-`docs/build-fixes.md`. Those exist because a few upstream projects have drifted
-past what LineageOS 23.2 provides, and because upstream's `base-patches-36` was
-authored against its own forks rather than against LineageOS trees that have
-moved since.
-
-`20-upstream` is upstream's `base-patches-36` vendored verbatim, minus the two
-`vendor/intel/gmmlib` patches, plus the `roms-patches` fallbacks. The
-`20-upstream` layer is applied **after** `10-lineage-forks`, because those
-patches were written against the forks.
-
-`packages/apps/TvSettings` is deliberately absent: the fork is 4 commits
-*behind* LineageOS and has nothing we lack, and it is an ATV-only app that a
-phone build does not use.
-
-## Deviation from upstream: gmmlib
-
-Upstream removes `platform/external/gmmlib` and adds `intel/gmmlib` at
-`vendor/intel/gmmlib`. That duplicates the project, and both trees declare
-`external_gmmlib_license`, `libigdgmm_android` and `libigdgmm_headers` with no
-`soong_namespace`, so bootstrap fails:
-
-```
-error: external/gmmlib/Android.bp:25:1: module "external_gmmlib_license"
-       already defined
-```
-
-LineageOS's own `external/gmmlib` is used instead, unpatched. Its two upstream
-patches are both unnecessary there: `0002` adds x86 to an `arch` block that
-already has it, and `0001` adds `GmmXe3P_XPCCachePolicy.cpp`, a file that only
-exists in intel's `intel-gmmlib-22.10.0` snapshot.
-
-`tools/check-dup-modules.py` is the preflight for this whole class of mistake.
-
-## The AOSP swaps, and why `remove-project` is unavoidable there
-
-`repo` gives a local manifest no way to point an existing project at a different
-upstream repository:
-
-* `<project path="X" .../>` is rejected as `duplicate path X`
-  (`.repo/repo/manifest_xml.py`, `recursively_add_projects`).
-* `<extend-project name="..." remote="..." revision="..."/>` is allowed, but it
-  keeps the original project **name**, so the fetch URL becomes
-  `<fetch>/platform/external/mesa3d` rather than the WayDroid fork.
-
-So swapping `platform/external/mesa3d` for
-`WayDroid-ATV/android_external_mesa3d` is only expressible as
-`remove-project` + `project`, exactly as upstream does it. These seven are all
-AOSP-remote display/media/rust trees that LineageOS does not maintain and no
-custom ROM touches, and the build does not link without them: ffmpeg's 32-bit
-variant needs `libva` for `android-x86`, and LineageOS's `external/libva` only
-enables `x86_64`.
-
-Because a swap replaces the local work tree, `manifest` runs
-`repo sync --force-sync` scoped to exactly those seven **before** the normal
-sync, since a plain `repo sync` also fails while those stale work trees are
-present. `apply` re-applies the patches that force-sync discards.
-
-Pass `--no-aosp-swaps` to install the strict pure-add manifest instead.
-
-## Tracking upstream
-
-```shell
-python3 tools/track-upstream.py            # human readable, same output as TRACKING.md
-python3 tools/track-upstream.py --regenerate
+python3 tools/track-upstream.py      # fork drift; output is TRACKING.md
+python3 tools/check-dup-modules.py <src> --ours manifest/10-waydroid-projects.xml
 tools/gen-fork-patches.sh <los-root> "$PWD/base-patches-36/10-lineage-forks" frameworks/base
 ```
-
-The GitHub compare API reports `ahead_by`/`behind_by` per fork. If `ahead` ever
-stops matching the number of patches on disk, regenerate that project.
 
 ## Building
 
@@ -268,21 +114,23 @@ mka systemimage
 mka vendorimage
 ```
 
-Two environment caveats:
+Two environment gotchas:
 
-* `repo` keeps a JSON cache beside whatever gitconfig it reads. If your
-  `~/.gitconfig` is newer than `~/.repo_.gitconfig.json`, `repo` tries to rewrite
-  the cache, and soong mounts `$HOME` read-only for the build, so the
-  `build-manifest.xml` rule dies with `Read-only file system`. Fix it by running
-  `repo manifest -o /dev/null` once **outside** a build to refresh the cache.
-* 15 GB of RAM is below what kati wants; it was `SIGKILL`ed at "finishing Make
-  module rules". A large swap file helps but does not remove the need for RAM.
+* `repo` caches JSON beside whatever gitconfig it reads. If `~/.gitconfig` is
+  newer than `~/.repo_.gitconfig.json`, the `build-manifest.xml` rule tries to
+  rewrite it, and soong mounts `$HOME` read-only, so it dies with
+  `Read-only file system`. Fix: run `repo manifest -o /dev/null` once **outside**
+  a build.
+* 15 GB of RAM is under what kati wants; it was `SIGKILL`ed at "finishing Make
+  module rules". A big swap file helps but does not remove the need for RAM.
+
+See `docs/build-fixes.md` for the six hand-written patches, including the
+mesa-tools `libxml2.so.2` soname alias, which is an alias and not the library
+LLVM 20 was built against.
 
 ## Provenance
 
-`20-upstream/` is a verbatim copy of `waydroid-patches/base-patches-36` and the
-`roms-patches` fallbacks from
+`20-upstream/` is verbatim from
 [WayDroid-ATV/android_vendor_waydroid](https://github.com/WayDroid-ATV/android_vendor_waydroid)
-(branch `lineage-23.2`), which is licensed GPL-3.0. `10-lineage-forks/` is
-generated from those same upstream commits and the hand-written fixes above, so
-it inherits the same licence. See `LICENSE-NOTES.md`.
+branch `lineage-23.2`, GPL-3.0. `10-lineage-forks/` derives from the same
+upstream commits, so it inherits that licence. See `LICENSE-NOTES.md`.
