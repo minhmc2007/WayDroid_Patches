@@ -8,11 +8,11 @@ Based on "Core: Add force mouse click as touch toggle"
 Co-authored-by: Umang96 <umangleekha3@gmail.com>
 Change-Id: Ibe26a1cdc41744ad201427093ec384b9a5a0e4b2
 ---
- core/java/android/view/ViewRootImpl.java | 23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
+ core/java/android/view/ViewRootImpl.java | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/core/java/android/view/ViewRootImpl.java b/core/java/android/view/ViewRootImpl.java
-index fa1c190e..973b71c0 100644
+index 072cc70f2..d8819c3ae 100644
 --- a/core/java/android/view/ViewRootImpl.java
 +++ b/core/java/android/view/ViewRootImpl.java
 @@ -210,6 +210,7 @@ import android.os.Looper;
@@ -23,7 +23,7 @@ index fa1c190e..973b71c0 100644
  import android.os.Process;
  import android.os.RemoteException;
  import android.os.ServiceManager;
-@@ -313,6 +314,7 @@ import java.io.StringWriter;
+@@ -315,6 +316,7 @@ import java.io.StringWriter;
  import java.lang.ref.WeakReference;
  import java.util.ArrayDeque;
  import java.util.ArrayList;
@@ -31,7 +31,7 @@ index fa1c190e..973b71c0 100644
  import java.util.HashSet;
  import java.util.List;
  import java.util.Objects;
-@@ -658,6 +660,7 @@ public final class ViewRootImpl implements ViewParent,
+@@ -661,6 +663,7 @@ public final class ViewRootImpl implements ViewParent,
      final Choreographer mChoreographer;
      protected final ViewFrameInfo mViewFrameInfo = new ViewFrameInfo();
      private final InputEventAssigner mInputEventAssigner = new InputEventAssigner();
@@ -39,11 +39,10 @@ index fa1c190e..973b71c0 100644
  
      // Whether to draw this surface as DISPLAY_DECORATION.
      boolean mDisplayDecorationCached = false;
-@@ -1369,7 +1372,17 @@ public final class ViewRootImpl implements ViewParent,
-             preInitBufferAllocator();
-             sPreInitializedBufferAllocator = true;
+@@ -1376,6 +1379,16 @@ public final class ViewRootImpl implements ViewParent,
          }
--    }
+ 
+         mNtThreeFingerGestureHelper = new NtThreeFingerGestureHelper(context);
 +
 +        String packageName = context.getPackageName();
 +        mFakeClickAsTouch = Arrays.stream(SystemProperties.get("persist.waydroid.fake_touch").split(","))
@@ -54,11 +53,10 @@ index fa1c190e..973b71c0 100644
 +
 +        if (mFakeClickAsTouch)
 +            Log.d(TAG, "Faking touch inputs for " + packageName);
-+}
+     }
  
      public static void addFirstDrawHandler(Runnable callback) {
-         synchronized (sFirstDrawHandlers) {
-@@ -10660,6 +10673,14 @@ public final class ViewRootImpl implements ViewParent,
+@@ -10675,6 +10688,14 @@ public final class ViewRootImpl implements ViewParent,
          Trace.asyncTraceBegin(Trace.TRACE_TAG_VIEW, "deliverInputEvent",
                  q.mEvent.getId());
  

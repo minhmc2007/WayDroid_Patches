@@ -6,26 +6,26 @@ Subject: [PATCH 12/22] Send idle-inhibit status to the waydroid hwcomposer
 Change-Id: Ib95ff6578c873ebe8926a4b18507742f0f8f6799
 ---
  services/core/Android.bp                      |  1 +
- .../com/android/server/wm/DisplayContent.java | 32 +++++++++++++++++--
- 2 files changed, 31 insertions(+), 2 deletions(-)
+ .../com/android/server/wm/DisplayContent.java | 30 ++++++++++++++++++-
+ 2 files changed, 30 insertions(+), 1 deletion(-)
 
 diff --git a/services/core/Android.bp b/services/core/Android.bp
-index e08be355..201473ef 100644
+index 19a53d595..5ad6707b6 100644
 --- a/services/core/Android.bp
 +++ b/services/core/Android.bp
-@@ -252,6 +252,7 @@ java_library_static {
+@@ -258,6 +258,7 @@ java_library_static {
          "clipboard_flags_lib",
          "aconfig_adbdauth_flags_java_lib",
          "AvfBuildFlags",
 +        "vendor.waydroid.window-V1.2-java",
+         "vendor.aospa.biometrics.face",
      ],
      javac_shard_size: 50,
-     javacflags: [
 diff --git a/services/core/java/com/android/server/wm/DisplayContent.java b/services/core/java/com/android/server/wm/DisplayContent.java
-index 27427724..96860526 100644
+index 43d741f3a..b2fe3cb9b 100644
 --- a/services/core/java/com/android/server/wm/DisplayContent.java
 +++ b/services/core/java/com/android/server/wm/DisplayContent.java
-@@ -269,6 +269,8 @@ import com.android.server.wm.utils.RotationCache;
+@@ -273,6 +273,8 @@ import com.android.server.wm.utils.RotationCache;
  import com.android.server.wm.utils.WmDisplayCutout;
  import com.android.window.flags.Flags;
  
@@ -34,7 +34,7 @@ index 27427724..96860526 100644
  import java.io.PrintWriter;
  import java.lang.annotation.Retention;
  import java.lang.annotation.RetentionPolicy;
-@@ -276,6 +278,7 @@ import java.util.ArrayList;
+@@ -280,6 +282,7 @@ import java.util.ArrayList;
  import java.util.HashMap;
  import java.util.Iterator;
  import java.util.LinkedList;
@@ -42,7 +42,7 @@ index 27427724..96860526 100644
  import java.util.Objects;
  import java.util.Set;
  import java.util.function.Consumer;
-@@ -1016,6 +1019,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
+@@ -1025,6 +1028,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
              w -> getDisplayPolicy().applyPostLayoutPolicyLw(w, w.mAttrs, w.getParentWindow(),
                      mImeLayeringTarget);
  
@@ -52,7 +52,7 @@ index 27427724..96860526 100644
      private final Consumer<WindowState> mApplySurfaceChangesTransaction = w -> {
          if (w.mHasSurface) {
              // Take care of the window being ready to display.
-@@ -1045,7 +1051,17 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
+@@ -1054,7 +1060,17 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
              }
  
              if (w.mHasSurface && isDisplayed) {
@@ -71,20 +71,18 @@ index 27427724..96860526 100644
                      mTmpHoldScreenWindow = w;
                  } else if (w == mLastWakeLockHoldingWindow) {
                      ProtoLog.d(WM_DEBUG_KEEP_SCREEN_ON,
-@@ -1256,7 +1272,11 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
+@@ -1269,6 +1285,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
          mWmService.mInputManager.setInTouchMode(mInTouchMode, mWmService.MY_PID, mWmService.MY_UID,
                  /* hasPermission= */ true, mDisplayId);
          mAppCompatCameraPolicy.start();
--    }
 +
 +        try {
 +            mWaydroidWindow = IWaydroidWindow.getService(false /* retry */);
 +        } catch (NoSuchElementException | RemoteException ignored) {}
-+}
+     }
  
      private void beginHoldScreenUpdate() {
-         mTmpHoldScreenWindow = null;
-@@ -1265,6 +1285,14 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
+@@ -1278,6 +1298,14 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
  
      private void finishHoldScreenUpdate() {
          final boolean hold = mTmpHoldScreenWindow != null;

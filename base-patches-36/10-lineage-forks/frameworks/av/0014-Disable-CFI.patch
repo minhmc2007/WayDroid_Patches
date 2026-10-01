@@ -6,15 +6,15 @@ Subject: [PATCH 14/29] Disable CFI
 The presence of CFI sanitizer makes the corresponding libraries to be
 missing from the com.android.media.swcodec APEX, when building for x86.
 ---
- media/codec2/components/base/Android.bp | 3 ---
+ media/codec2/components/base/Android.bp | 1 -
  media/codec2/sfplugin/utils/Android.bp  | 1 -
  media/module/bqhelper/Android.bp        | 1 -
  media/module/codecs/flac/dec/Android.bp | 1 -
  media/module/foundation/Android.bp      | 1 -
- 5 files changed, 7 deletions(-)
+ 5 files changed, 5 deletions(-)
 
 diff --git a/media/codec2/components/base/Android.bp b/media/codec2/components/base/Android.bp
-index 2b59ee34f..ca81b85e1 100644
+index f3f6b81..d77cd9c 100644
 --- a/media/codec2/components/base/Android.bp
 +++ b/media/codec2/components/base/Android.bp
 @@ -64,7 +64,6 @@ cc_library {
@@ -25,24 +25,8 @@ index 2b59ee34f..ca81b85e1 100644
      },
  
      ldflags: ["-Wl,-Bsymbolic"],
-@@ -123,7 +122,6 @@ cc_defaults {
-             "unsigned-integer-overflow",
-             "signed-integer-overflow",
-         ],
--        cfi: true,
-     },
- }
- 
-@@ -143,7 +141,6 @@ cc_defaults {
-     name: "libcodec2_soft_sanitize_cfi-defaults",
- 
-     sanitize: {
--        cfi: true,
-         config: {
-             cfi_assembly_support: true,
-         },
 diff --git a/media/codec2/sfplugin/utils/Android.bp b/media/codec2/sfplugin/utils/Android.bp
-index bed594c53..0c465dd27 100644
+index bed594c..0c465dd 100644
 --- a/media/codec2/sfplugin/utils/Android.bp
 +++ b/media/codec2/sfplugin/utils/Android.bp
 @@ -58,7 +58,6 @@ cc_library {
@@ -54,7 +38,7 @@ index bed594c53..0c465dd27 100644
              "unsigned-integer-overflow",
              "signed-integer-overflow",
 diff --git a/media/module/bqhelper/Android.bp b/media/module/bqhelper/Android.bp
-index 6fd30032b..8dcdf87dd 100644
+index 6fd3003..8dcdf87 100644
 --- a/media/module/bqhelper/Android.bp
 +++ b/media/module/bqhelper/Android.bp
 @@ -67,7 +67,6 @@ cc_defaults {
@@ -66,7 +50,7 @@ index 6fd30032b..8dcdf87dd 100644
  }
  
 diff --git a/media/module/codecs/flac/dec/Android.bp b/media/module/codecs/flac/dec/Android.bp
-index 83fcc0176..02e60f733 100644
+index 83fcc01..02e60f7 100644
 --- a/media/module/codecs/flac/dec/Android.bp
 +++ b/media/module/codecs/flac/dec/Android.bp
 @@ -42,7 +42,6 @@ cc_library {
@@ -78,7 +62,7 @@ index 83fcc0176..02e60f733 100644
  
      shared_libs: [
 diff --git a/media/module/foundation/Android.bp b/media/module/foundation/Android.bp
-index edf4cb59e..e769e42cd 100644
+index edf4cb5..e769e42 100644
 --- a/media/module/foundation/Android.bp
 +++ b/media/module/foundation/Android.bp
 @@ -127,7 +127,6 @@ cc_defaults {

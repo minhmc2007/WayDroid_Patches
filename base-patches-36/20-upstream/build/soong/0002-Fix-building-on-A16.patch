@@ -1,4 +1,4 @@
-From 36e0d8cdfe25b1adc6690598c8cb99e5fa9bcbfd Mon Sep 17 00:00:00 2001
+From a9d58c5e4bd6a16f709aaf8a7fd7484b352e1a0c Mon Sep 17 00:00:00 2001
 From: SupeChicken666 <me@supechicken666.dev>
 Date: Sat, 28 Feb 2026 18:53:31 +0000
 Subject: [PATCH 2/5] Fix building on A16
@@ -25,13 +25,13 @@ index 6c887a0..953b438 100644
  		for _, m := range android.SortedKeys(nonGenericModules) {
  			errStr += fmt.Sprintf("\t%q from %q,\n", m, nonGenericModules[m])
 diff --git a/scripts/check_boot_jars/package_allowed_list.txt b/scripts/check_boot_jars/package_allowed_list.txt
-index 95fe0b3..bbee6a1 100644
+index 4dd0093..e1d524b 100644
 --- a/scripts/check_boot_jars/package_allowed_list.txt
 +++ b/scripts/check_boot_jars/package_allowed_list.txt
-@@ -304,3 +304,6 @@ qcom.fmradio
+@@ -317,3 +317,6 @@ com.camera.camera2.extensions.*
  ###################################################
- # IFAA Manager used for Alipay and/or WeChat payment
- org\.ifaa\.android\.manager.*
+ # Xiaomi adds
+ com\.xiaomi\..*
 +
 +# Waydroid
 +vendor\.waydroid\..*

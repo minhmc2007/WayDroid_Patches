@@ -71,7 +71,7 @@ index e9345a5..058bf7f 100644
          "Controller": "memory",
          "Path": ".",
 diff --git a/libprocessgroup/profiles/task_profiles.json b/libprocessgroup/profiles/task_profiles.json
-index 1d23d9c..738902c 100644
+index 98b15bf..9f04875 100644
 --- a/libprocessgroup/profiles/task_profiles.json
 +++ b/libprocessgroup/profiles/task_profiles.json
 @@ -92,16 +92,7 @@
@@ -590,7 +590,7 @@ index 1d23d9c..738902c 100644
 -      ]
 -    },
      {
-       "Name": "CompactFull",
+       "Name": "CPUSET_SP_AX_FOREGROUND",
        "Actions": [
 diff --git a/libprocessgroup/task_profiles.cpp b/libprocessgroup/task_profiles.cpp
 index 2730743..5cf1cdc 100644
