@@ -28,8 +28,9 @@ LineageOS rather than against the forks; README.md lists them. A ninth,
 against a WayDroid-ATV project file, so it is GPL-3.0 for the same reason and
 sits in a GPL-3.0 layer rather than in `15-ours/`. Author date and subject of
 the eight are unchanged. All nine stay GPL-3.0: they are modifications of
-GPL-3.0 upstream commits, so they belong in a GPL-3.0 layer and must not be
-moved into `15-ours/`, whose Apache-2.0 covers only work not derived from any
+GPL-3.0 upstream commits or files, so they belong in a GPL-3.0 layer and must
+not be moved into `15-ours/`, whose Apache-2.0 covers only work not derived
+from any
 upstream commit.
 
 GPL-3.0 applies to the patch *text*. The trees they modify are the Android

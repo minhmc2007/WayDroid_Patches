@@ -102,17 +102,32 @@ licence, so moving them would be wrong.
 | `soong/0002` | the allow-list ends with Xiaomi entries; Waydroid's appended |
 | `Connectivity/0001` | JIT writes test `isAtLeastKernelVersion(4, 14, 0)`, not `(5, 13)`; `NetdUpdatable.cpp` is already abort-free |
 
-**GApps.** AxionOS ships its own Google apps in `vendor/gms`, which
-`vendor/lineage/config/common.mk` inherits when `WITH_GMS=true` — that is what
-`axion <device> … gms` sets. Waydroid's `vendor/gapps` declares the *same*
-modules: `Velvet`, `Phonesky`, `talkback` and `MarkupGoogle_v2` are each defined
-in both `vendor/gapps/x86_64` and `vendor/gms/common`, so enabling both fails
-soong bootstrap with `found in multiple namespaces`. Every product but
-`waydroid_x86_64_only` defaulted `ANDROID_USE_GAPPS` to `true`, so any of them
-collided once GMS was on; `20-upstream/device/waydroid/waydroid/0001` defaults it
-off everywhere and lets `WITH_GMS` pick the set. `ANDROID_USE_GAPPS=true` still
-selects Waydroid's, which then needs a non-GMS (`va`) build. Both projects stay
-synced, so the choice is per-build rather than per-tree.
+**GApps: build x86_64 with `va`, not `gms`.** There are two Google app sets and
+they collide.
+
+| | AxionOS `vendor/gms` | Waydroid `vendor/gapps` |
+|---|---|---|
+| ABIs | `arm64-v8a`, `armeabi-v7a` only | `x86_64` |
+| artifact paths | `system/framework/{arm,arm64}` only | — |
+| selected by | `axion <device> … gms` → `WITH_GMS=true` | `ANDROID_USE_GAPPS=true` |
+
+AxionOS's set is **arm-only** — no APK in it has an x86_64 ABI. Waydroid's is
+the smaller set that does ship x86_64. Both declare `Velvet`, `Phonesky`,
+`talkback` and `MarkupGoogle_v2`, so having both in `system` fails soong
+bootstrap with `found in multiple namespaces`.
+
+`20-upstream/device/waydroid/waydroid/0001` therefore picks per architecture:
+arm targets keep `ANDROID_USE_GAPPS=false` and use AxionOS's set via `gms`;
+x86_64 targets use `ANDROID_USE_GAPPS=true` and Waydroid's. So an x86_64 build
+must **not** set `WITH_GMS`:
+
+```shell
+axion waydroid_x86_64 userdebug va     # x86_64, uses Waydroid GApps
+axion waydroid_arm64 userdebug gms     # arm, uses AxionOS GApps
+```
+
+`gms` on x86_64 is the failing case and cannot be made to work: AxionOS's APKs
+have no x86_64 native libraries to install.
 
 The assignment cannot move to `device.mk`: `inherit-product` is deferred and
 resolves in `build/make/core/node_fns.mk` `_import-node`, which recurses into

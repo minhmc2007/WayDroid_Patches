@@ -1,27 +1,30 @@
-From 49a022cee4811f3567fc2636fd27b6769e92d6cd Mon Sep 17 00:00:00 2001
+From 9c4f8ae44633da030e0494f52f65dd5a823c9a0a Mon Sep 17 00:00:00 2001
 From: minhmc2007 <quangminh21072010@gmail.com>
-Date: Thu, 1 Oct 2026 14:43:27 +0700
-Subject: [PATCH] device: default ANDROID_USE_GAPPS off in every product
+Date: Thu, 1 Oct 2026 14:56:03 +0700
+Subject: [PATCH] device: pick GApps per architecture
 
-AxionOS ships its own Google apps in vendor/gms, which vendor/lineage/
-config/common.mk inherits when WITH_GMS=true. Waydroid's vendor/gapps
-defines the same modules: Velvet, Phonesky, talkback and MarkupGoogle_v2
-are each declared in both vendor/gapps/x86_64 and vendor/gms/common, so
-enabling both makes soong bootstrap fail with
+AxionOS ships Google apps in vendor/gms, but only for arm: every APK
+carries arm64-v8a or armeabi-v7a, and products/gms.mk whitelists just
+system/framework/{arm,arm64} artifact paths. Nothing in it has an x86_64
+ABI, so it cannot run on an x86_64 target.
 
-  module "Velvet" variant "android_common": found in multiple
-  namespaces(vendor/gapps/x86_64 and vendor/gms/common)
+Waydroid's vendor/gapps is the smaller set that does ship x86_64: its
+Phonesky, Velvet, talkback and MarkupGoogle_v2 are all x86_64.
 
-Every product but waydroid_x86_64_only defaulted ANDROID_USE_GAPPS to
-true, so any of them collided once GMS was on. Default it off and let
-WITH_GMS select AxionOS's set; ANDROID_USE_GAPPS=true still selects
-Waydroid's, which then needs a non-GMS build.
+So the right default depends on the target's architecture. On arm, keep
+AxionOS's set, which is what `axion <device> gms` selects. On x86_64,
+select Waydroid's instead.
 
-The assignment has to stay where it is. inherit-product is deferred and
-resolves in build/make/core/node_fns.mk _import-node, which recurses
-into INHERITS_FROM only after the product makefile is fully parsed, so
-setting this from device.mk would be too late: line 17 and the ifeq on
-line 28 both run before device.mk is read.
+Both sets declare Velvet, Phonesky, talkback and MarkupGoogle_v2, so
+having both in the system partition fails soong bootstrap with "found in
+multiple namespaces(vendor/gapps/x86_64 and vendor/gms/common)". An x86_64
+build therefore must not set WITH_GMS, which is what the va/vanilla
+variant does.
+
+The assignment stays in the product makefiles. inherit-product is
+deferred and resolves in build/make/core/node_fns.mk _import-node, which
+recurses into INHERITS_FROM only after the product makefile is fully
+parsed, so a device.mk override would be evaluated too late.
 ---
  waydroid_arm/lineage_waydroid_arm.mk                     | 2 +-
  waydroid_arm64/lineage_waydroid_arm64.mk                 | 2 +-
@@ -29,9 +32,8 @@ line 28 both run before device.mk is read.
  waydroid_tv_arm/lineage_waydroid_tv_arm.mk               | 2 +-
  waydroid_tv_arm64/lineage_waydroid_tv_arm64.mk           | 2 +-
  waydroid_tv_arm64_only/lineage_waydroid_tv_arm64_only.mk | 2 +-
- waydroid_tv_x86_64/lineage_waydroid_tv_x86_64.mk         | 2 +-
- waydroid_x86_64/lineage_waydroid_x86_64.mk               | 2 +-
- 8 files changed, 8 insertions(+), 8 deletions(-)
+ waydroid_x86_64_only/lineage_waydroid_x86_64_only.mk     | 2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/waydroid_arm/lineage_waydroid_arm.mk b/waydroid_arm/lineage_waydroid_arm.mk
 index bd5b2ed..ba1bed6 100644
@@ -111,29 +113,16 @@ index 60a2ad4..8bcce7d 100644
  
  # Inherit from those products. Most specific first.
  $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit_only.mk)
-diff --git a/waydroid_tv_x86_64/lineage_waydroid_tv_x86_64.mk b/waydroid_tv_x86_64/lineage_waydroid_tv_x86_64.mk
-index ebf4df3..91e84cd 100644
---- a/waydroid_tv_x86_64/lineage_waydroid_tv_x86_64.mk
-+++ b/waydroid_tv_x86_64/lineage_waydroid_tv_x86_64.mk
-@@ -17,7 +17,7 @@
- PRODUCT_IS_ATV := true
- TARGET_ATV_FORCE_1080_SCALING := false
- 
--ANDROID_USE_GAPPS ?= true
-+ANDROID_USE_GAPPS ?= false
- ANDROID_USE_NDK_TRANSLATION ?= true
- ANDROID_USE_WIDEVINE ?= true
- 
-diff --git a/waydroid_x86_64/lineage_waydroid_x86_64.mk b/waydroid_x86_64/lineage_waydroid_x86_64.mk
-index 927558f..07dc757 100644
---- a/waydroid_x86_64/lineage_waydroid_x86_64.mk
-+++ b/waydroid_x86_64/lineage_waydroid_x86_64.mk
+diff --git a/waydroid_x86_64_only/lineage_waydroid_x86_64_only.mk b/waydroid_x86_64_only/lineage_waydroid_x86_64_only.mk
+index 5063a62..b663918 100644
+--- a/waydroid_x86_64_only/lineage_waydroid_x86_64_only.mk
++++ b/waydroid_x86_64_only/lineage_waydroid_x86_64_only.mk
 @@ -14,7 +14,7 @@
  # limitations under the License.
  #
  
--ANDROID_USE_GAPPS ?= true
-+ANDROID_USE_GAPPS ?= false
+-ANDROID_USE_GAPPS ?= false
++ANDROID_USE_GAPPS ?= true
  ANDROID_USE_NDK_TRANSLATION ?= true
  ANDROID_USE_WIDEVINE ?= true
  
