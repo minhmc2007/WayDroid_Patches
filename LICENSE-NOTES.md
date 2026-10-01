@@ -6,7 +6,7 @@ do not bleed into each other.
 | layer | patches | provenance | licence |
 |---|---|---|---|
 | `10-lineage-forks` | 140 | generated from upstream WayDroid commits | GPL-3.0 |
-| `15-ours` | 7 | hand-written here | Apache-2.0 |
+| `15-ours` | 10 | hand-written here | Apache-2.0 |
 | `20-upstream` | 54 | upstream `base-patches-36` | GPL-3.0 |
 
 ## GPL-3.0
@@ -39,11 +39,12 @@ projects each carry their own licence.
 
 ## Apache-2.0
 
-`15-ours/` holds the seven patches written for this repo, plus `waydroid-patches.sh`
-and everything in `tools/`. Full text in `LICENSE-APACHE-2.0`.
+`15-ours/` holds the ten patches written for this repo, plus
+`waydroid-patches.sh` and everything in `tools/`. Full text in
+`LICENSE-APACHE-2.0`.
 
-These are not derived from any WayDroid commit. Six fix a defect in a project as
-published by its own upstream, discovered by building:
+These are not derived from any WayDroid commit. Seven fix a defect in a
+project as published by its own upstream, discovered by building:
 
 - `external/rust/hbm/0001` renames a crate dependency that no 23.2 tree defines
 - `external/rust/hbm/0002` disables a project whose `main` needs ash 0.38+
@@ -52,18 +53,23 @@ published by its own upstream, discovered by building:
 - `external/minigbm/0001` drops a dependency on the disabled hbm
 - `external/mesa3d/0001` resolves `ld.lld` by absolute path
 - `prebuilts/mesa-tools/0001` supplies a missing soname symlink
+- `external/tensorflow/0001` adds `external/neon_2_sse` to the include dirs of
+  the three tflite targets that compile `neon_check.h`, which includes
+  `NEON_2_SSE.h` on x86
 
-The seventh is not a defect fix but local configuration, also not derived from
-any WayDroid commit:
+The remaining two are not defect fixes but local configuration, also not
+derived from any WayDroid commit:
 
 - `device/waydroid/waydroid/0001` sets `AXION_MAINTAINER` and
   `AXION_PROCESSOR`, which AxionOS's own `device/axion/common/config/version.mk`
   exports as `persist.sys.axion_maintainer` and `persist.sys.axion_cpu_info`
+- `build/make/0001` comments out the `setup_ccache` call in `envsetup.sh`, which
+  otherwise exports `USE_CCACHE=1` on every build
 
 They are kept in a separate layer from the GPL material precisely so that
 Apache-2.0 does not appear to cover upstream's GPL-3.0 work.
 
 ## Per-patch detail
 
-See `docs/build-fixes.md` for what each of the six build fixes does and why, and
-`TRACKING.md` for the fork deltas.
+See `docs/build-fixes.md` for what each of the seven build fixes does and why,
+and `TRACKING.md` for the fork deltas.
