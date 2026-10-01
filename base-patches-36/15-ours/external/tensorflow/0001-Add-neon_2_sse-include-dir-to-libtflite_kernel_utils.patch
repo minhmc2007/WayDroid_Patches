@@ -1,20 +1,21 @@
-From 6eba260900bd65a1fab215f4ee90cbcd0b945dc7 Mon Sep 17 00:00:00 2001
+From 20f3ca317e8656fb5510e8d279aaa986ccae948c Mon Sep 17 00:00:00 2001
 From: minhmc2007 <quangminh21072010@gmail.com>
-Date: Fri, 2 Oct 2026 05:14:04 +0700
-Subject: [PATCH] Add neon_2_sse include dir to libtflite_kernel_utils
+Date: Fri, 2 Oct 2026 05:53:21 +0700
+Subject: [PATCH] Add neon_2_sse include dir to the tflite kernels that need it
 
-Change-Id: I552f1f83da677dd94ea59a0bf8363c5f2a7c3ec4
+Change-Id: Ic44cc70f55446d1b435e29a074f418ba51e2bcd1
 ---
  tensorflow/lite/kernels/Android.bp | 7 +++++++
- 1 file changed, 7 insertions(+)
+ tensorflow/lite/tflite_static.bp   | 1 +
+ 2 files changed, 8 insertions(+)
 
 diff --git a/tensorflow/lite/kernels/Android.bp b/tensorflow/lite/kernels/Android.bp
-index 52377943..ce5bf4d0 100644
+index ce5bf4d0..4c7bf6ef 100644
 --- a/tensorflow/lite/kernels/Android.bp
 +++ b/tensorflow/lite/kernels/Android.bp
-@@ -47,6 +47,13 @@ cc_library_static {
+@@ -190,6 +190,13 @@ cc_library_static {
      static_libs: [
-         "libruy_static",
+         "libfft2d",
      ],
 +    // internal/optimized/neon_check.h includes NEON_2_SSE.h on x86, which
 +    // emulates the ARM intrinsics with SSE. Without this the x86_64 build
@@ -24,8 +25,20 @@ index 52377943..ce5bf4d0 100644
 +        "external/neon_2_sse",
 +    ],
      cflags: [
-         "-Wno-extern-c-compat",
-         "-Wno-sign-compare",
+         "-DNAMESPACE_FOR_HASH_FUNCTIONS=farmhash",
+     ],
+diff --git a/tensorflow/lite/tflite_static.bp b/tensorflow/lite/tflite_static.bp
+index b2b0952f..dce5ebd8 100644
+--- a/tensorflow/lite/tflite_static.bp
++++ b/tensorflow/lite/tflite_static.bp
+@@ -219,6 +219,7 @@ cc_library_static {
+         "external/flatbuffers/include",
+         "external/gemmlowp",
+         "external/libtextclassifier/native/",
++        "external/neon_2_sse",
+         "external/tensorflow",
+     ],
+     whole_static_libs: [
 -- 
 2.55.0
 
