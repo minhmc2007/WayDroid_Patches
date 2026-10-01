@@ -1,0 +1,142 @@
+From 49a022cee4811f3567fc2636fd27b6769e92d6cd Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Thu, 1 Oct 2026 14:43:27 +0700
+Subject: [PATCH] device: default ANDROID_USE_GAPPS off in every product
+
+AxionOS ships its own Google apps in vendor/gms, which vendor/lineage/
+config/common.mk inherits when WITH_GMS=true. Waydroid's vendor/gapps
+defines the same modules: Velvet, Phonesky, talkback and MarkupGoogle_v2
+are each declared in both vendor/gapps/x86_64 and vendor/gms/common, so
+enabling both makes soong bootstrap fail with
+
+  module "Velvet" variant "android_common": found in multiple
+  namespaces(vendor/gapps/x86_64 and vendor/gms/common)
+
+Every product but waydroid_x86_64_only defaulted ANDROID_USE_GAPPS to
+true, so any of them collided once GMS was on. Default it off and let
+WITH_GMS select AxionOS's set; ANDROID_USE_GAPPS=true still selects
+Waydroid's, which then needs a non-GMS build.
+
+The assignment has to stay where it is. inherit-product is deferred and
+resolves in build/make/core/node_fns.mk _import-node, which recurses
+into INHERITS_FROM only after the product makefile is fully parsed, so
+setting this from device.mk would be too late: line 17 and the ifeq on
+line 28 both run before device.mk is read.
+---
+ waydroid_arm/lineage_waydroid_arm.mk                     | 2 +-
+ waydroid_arm64/lineage_waydroid_arm64.mk                 | 2 +-
+ waydroid_arm64_only/lineage_waydroid_arm64_only.mk       | 2 +-
+ waydroid_tv_arm/lineage_waydroid_tv_arm.mk               | 2 +-
+ waydroid_tv_arm64/lineage_waydroid_tv_arm64.mk           | 2 +-
+ waydroid_tv_arm64_only/lineage_waydroid_tv_arm64_only.mk | 2 +-
+ waydroid_tv_x86_64/lineage_waydroid_tv_x86_64.mk         | 2 +-
+ waydroid_x86_64/lineage_waydroid_x86_64.mk               | 2 +-
+ 8 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/waydroid_arm/lineage_waydroid_arm.mk b/waydroid_arm/lineage_waydroid_arm.mk
+index bd5b2ed..ba1bed6 100644
+--- a/waydroid_arm/lineage_waydroid_arm.mk
++++ b/waydroid_arm/lineage_waydroid_arm.mk
+@@ -14,7 +14,7 @@
+ # limitations under the License.
+ #
+ 
+-ANDROID_USE_GAPPS ?= true
++ANDROID_USE_GAPPS ?= false
+ 
+ # Inherit from waydroid device
+ $(call inherit-product, $(LOCAL_PATH)/../device.mk)
+diff --git a/waydroid_arm64/lineage_waydroid_arm64.mk b/waydroid_arm64/lineage_waydroid_arm64.mk
+index 2014037..97e8beb 100644
+--- a/waydroid_arm64/lineage_waydroid_arm64.mk
++++ b/waydroid_arm64/lineage_waydroid_arm64.mk
+@@ -14,7 +14,7 @@
+ # limitations under the License.
+ #
+ 
+-ANDROID_USE_GAPPS ?= true
++ANDROID_USE_GAPPS ?= false
+ 
+ # Inherit from those products. Most specific first.
+ $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
+diff --git a/waydroid_arm64_only/lineage_waydroid_arm64_only.mk b/waydroid_arm64_only/lineage_waydroid_arm64_only.mk
+index 9d70255..c424d77 100644
+--- a/waydroid_arm64_only/lineage_waydroid_arm64_only.mk
++++ b/waydroid_arm64_only/lineage_waydroid_arm64_only.mk
+@@ -14,7 +14,7 @@
+ # limitations under the License.
+ #
+ 
+-ANDROID_USE_GAPPS ?= true
++ANDROID_USE_GAPPS ?= false
+ 
+ # Inherit from those products. Most specific first.
+ $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit_only.mk)
+diff --git a/waydroid_tv_arm/lineage_waydroid_tv_arm.mk b/waydroid_tv_arm/lineage_waydroid_tv_arm.mk
+index e966bf0..28feac9 100644
+--- a/waydroid_tv_arm/lineage_waydroid_tv_arm.mk
++++ b/waydroid_tv_arm/lineage_waydroid_tv_arm.mk
+@@ -17,7 +17,7 @@
+ PRODUCT_IS_ATV := true
+ TARGET_ATV_FORCE_1080_SCALING := false
+ 
+-ANDROID_USE_GAPPS ?= true
++ANDROID_USE_GAPPS ?= false
+ 
+ # Inherit from waydroid device
+ $(call inherit-product, $(LOCAL_PATH)/../device.mk)
+diff --git a/waydroid_tv_arm64/lineage_waydroid_tv_arm64.mk b/waydroid_tv_arm64/lineage_waydroid_tv_arm64.mk
+index 4590a88..03292e9 100644
+--- a/waydroid_tv_arm64/lineage_waydroid_tv_arm64.mk
++++ b/waydroid_tv_arm64/lineage_waydroid_tv_arm64.mk
+@@ -17,7 +17,7 @@
+ PRODUCT_IS_ATV := true
+ TARGET_ATV_FORCE_1080_SCALING := false
+ 
+-ANDROID_USE_GAPPS ?= true
++ANDROID_USE_GAPPS ?= false
+ 
+ # Inherit from those products. Most specific first.
+ $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
+diff --git a/waydroid_tv_arm64_only/lineage_waydroid_tv_arm64_only.mk b/waydroid_tv_arm64_only/lineage_waydroid_tv_arm64_only.mk
+index 60a2ad4..8bcce7d 100644
+--- a/waydroid_tv_arm64_only/lineage_waydroid_tv_arm64_only.mk
++++ b/waydroid_tv_arm64_only/lineage_waydroid_tv_arm64_only.mk
+@@ -17,7 +17,7 @@
+ PRODUCT_IS_ATV := true
+ TARGET_ATV_FORCE_1080_SCALING := false
+ 
+-ANDROID_USE_GAPPS ?= true
++ANDROID_USE_GAPPS ?= false
+ 
+ # Inherit from those products. Most specific first.
+ $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit_only.mk)
+diff --git a/waydroid_tv_x86_64/lineage_waydroid_tv_x86_64.mk b/waydroid_tv_x86_64/lineage_waydroid_tv_x86_64.mk
+index ebf4df3..91e84cd 100644
+--- a/waydroid_tv_x86_64/lineage_waydroid_tv_x86_64.mk
++++ b/waydroid_tv_x86_64/lineage_waydroid_tv_x86_64.mk
+@@ -17,7 +17,7 @@
+ PRODUCT_IS_ATV := true
+ TARGET_ATV_FORCE_1080_SCALING := false
+ 
+-ANDROID_USE_GAPPS ?= true
++ANDROID_USE_GAPPS ?= false
+ ANDROID_USE_NDK_TRANSLATION ?= true
+ ANDROID_USE_WIDEVINE ?= true
+ 
+diff --git a/waydroid_x86_64/lineage_waydroid_x86_64.mk b/waydroid_x86_64/lineage_waydroid_x86_64.mk
+index 927558f..07dc757 100644
+--- a/waydroid_x86_64/lineage_waydroid_x86_64.mk
++++ b/waydroid_x86_64/lineage_waydroid_x86_64.mk
+@@ -14,7 +14,7 @@
+ # limitations under the License.
+ #
+ 
+-ANDROID_USE_GAPPS ?= true
++ANDROID_USE_GAPPS ?= false
+ ANDROID_USE_NDK_TRANSLATION ?= true
+ ANDROID_USE_WIDEVINE ?= true
+ 
+-- 
+2.55.0
+

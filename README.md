@@ -75,7 +75,7 @@ onto this tree by hand; see "Deviations from upstream".
 `15-ours` (7) — hand-written build fixes, Apache-2.0, kept in their own layer so
 the licences stay separate. `docs/build-fixes.md` explains each.
 
-`20-upstream` (53) — upstream's `base-patches-36` plus the `roms-patches`
+`20-upstream` (54) — upstream's `base-patches-36` plus the `roms-patches`
 conflict fallbacks. Written against the forks, so it goes **after** layer 10.
 GPL-3.0.
 
@@ -101,6 +101,23 @@ licence, so moving them would be wrong.
 | `core/0026` | the one rejected hunk also carried the `createDir` bail-out removals |
 | `soong/0002` | the allow-list ends with Xiaomi entries; Waydroid's appended |
 | `Connectivity/0001` | JIT writes test `isAtLeastKernelVersion(4, 14, 0)`, not `(5, 13)`; `NetdUpdatable.cpp` is already abort-free |
+
+**GApps.** AxionOS ships its own Google apps in `vendor/gms`, which
+`vendor/lineage/config/common.mk` inherits when `WITH_GMS=true` — that is what
+`axion <device> … gms` sets. Waydroid's `vendor/gapps` declares the *same*
+modules: `Velvet`, `Phonesky`, `talkback` and `MarkupGoogle_v2` are each defined
+in both `vendor/gapps/x86_64` and `vendor/gms/common`, so enabling both fails
+soong bootstrap with `found in multiple namespaces`. Every product but
+`waydroid_x86_64_only` defaulted `ANDROID_USE_GAPPS` to `true`, so any of them
+collided once GMS was on; `20-upstream/device/waydroid/waydroid/0001` defaults it
+off everywhere and lets `WITH_GMS` pick the set. `ANDROID_USE_GAPPS=true` still
+selects Waydroid's, which then needs a non-GMS (`va`) build. Both projects stay
+synced, so the choice is per-build rather than per-tree.
+
+The assignment cannot move to `device.mk`: `inherit-product` is deferred and
+resolves in `build/make/core/node_fns.mk` `_import-node`, which recurses into
+`INHERITS_FROM` only after the product makefile is fully parsed, so both the
+`?=` and the `ifeq` run first.
 
 **gmmlib.** Upstream removes `platform/external/gmmlib` and adds `intel/gmmlib`
 at `vendor/intel/gmmlib`. Both declare `libigdgmm_android` and friends with no

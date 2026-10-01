@@ -7,7 +7,7 @@ do not bleed into each other.
 |---|---|---|---|
 | `10-lineage-forks` | 140 | generated from upstream WayDroid commits | GPL-3.0 |
 | `15-ours` | 7 | hand-written here | Apache-2.0 |
-| `20-upstream` | 53 | upstream `base-patches-36` | GPL-3.0 |
+| `20-upstream` | 54 | upstream `base-patches-36` | GPL-3.0 |
 
 ## GPL-3.0
 
@@ -21,10 +21,13 @@ is that project's upstream commit and inherits its licence.
 `20-upstream/` is a copy of upstream's
 `waydroid-patches/base-patches-36` plus its `roms-patches` fallbacks.
 
-Eight of these 193 patches (6 in `10-lineage-forks`, 2 in `20-upstream`) are
+Eight of these 194 patches (6 in `10-lineage-forks`, 2 in `20-upstream`) are
 re-emitted with `git format-patch` after being resolved by hand against
-LineageOS rather than against the forks; README.md lists them. Their author
-date and subject are unchanged, and they stay GPL-3.0: they are modifications of
+LineageOS rather than against the forks; README.md lists them. A ninth,
+`20-upstream/device/waydroid/waydroid/0001`, is written here from scratch
+against a WayDroid-ATV project file, so it is GPL-3.0 for the same reason and
+sits in a GPL-3.0 layer rather than in `15-ours/`. Author date and subject of
+the eight are unchanged. All nine stay GPL-3.0: they are modifications of
 GPL-3.0 upstream commits, so they belong in a GPL-3.0 layer and must not be
 moved into `15-ours/`, whose Apache-2.0 covers only work not derived from any
 upstream commit.
