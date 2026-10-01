@@ -1,0 +1,27 @@
+From fd66a1d7290e1d605901021a9a989c004b9e17df Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Thu, 1 Oct 2026 16:33:25 +0700
+Subject: [PATCH] Drop arm64-only Megvii prebuilts from FaceUnlock
+
+---
+ Android.bp | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/Android.bp b/Android.bp
+index 82a72ca..ff89b00 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -26,10 +26,6 @@ android_app {
+     ],
+ 
+     required: [
+-        "libFaceDetectCA",
+-        "libmegface_faceunlock",
+-        "libMegviiUnlock",
+-        "libMegviiUnlock-jni-1.2",
+         "default_permissions_co.aospa.sense.xml",
+         "hiddenapi-whitelist-co.aospa.sense.xml",
+         "privapp_whitelist_co.aospa.sense.xml",
+-- 
+2.55.0
+
