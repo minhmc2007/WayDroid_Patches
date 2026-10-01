@@ -1,0 +1,31 @@
+From 6eba260900bd65a1fab215f4ee90cbcd0b945dc7 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Fri, 2 Oct 2026 05:14:04 +0700
+Subject: [PATCH] Add neon_2_sse include dir to libtflite_kernel_utils
+
+Change-Id: I552f1f83da677dd94ea59a0bf8363c5f2a7c3ec4
+---
+ tensorflow/lite/kernels/Android.bp | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/tensorflow/lite/kernels/Android.bp b/tensorflow/lite/kernels/Android.bp
+index 52377943..ce5bf4d0 100644
+--- a/tensorflow/lite/kernels/Android.bp
++++ b/tensorflow/lite/kernels/Android.bp
+@@ -47,6 +47,13 @@ cc_library_static {
+     static_libs: [
+         "libruy_static",
+     ],
++    // internal/optimized/neon_check.h includes NEON_2_SSE.h on x86, which
++    // emulates the ARM intrinsics with SSE. Without this the x86_64 build
++    // fails in neon_tensor_utils.cc.
++    include_dirs: [
++        "external/gemmlowp",
++        "external/neon_2_sse",
++    ],
+     cflags: [
+         "-Wno-extern-c-compat",
+         "-Wno-sign-compare",
+-- 
+2.55.0
+
