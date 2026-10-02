@@ -72,7 +72,7 @@ never a LineageOS one. A diverged fork is fine: `lineage-sdk` is 2 LineageOS
 commits behind, and those stay untouched. GPL-3.0. Eight of the 140 are rebased
 onto this tree by hand, see "Deviations from upstream".
 
-`15-ours` (11), hand written build fixes and local config, Apache-2.0, kept in
+`15-ours` (12), hand written build fixes and local config, Apache-2.0, kept in
 their own layer so the licences stay separate. `docs/build-fixes.md` explains
 each.
 
@@ -182,7 +182,7 @@ Two environment gotchas:
 * 15 GB of RAM is under what kati wants; it was `SIGKILL`ed at "finishing Make
   module rules". A big swap file helps but does not remove the need for RAM.
 
-`docs/tools.md` covers the tooling. `docs/build-fixes.md` covers all eleven `15-ours`
+`docs/tools.md` covers the tooling. `docs/build-fixes.md` covers all twelve `15-ours`
 patches, including the mesa-tools `libxml2.so.2` soname alias, which is an alias
 and not the library LLVM 20 was built against.
 

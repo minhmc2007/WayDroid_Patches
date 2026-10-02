@@ -6,7 +6,7 @@ do not bleed into each other.
 | layer | patches | provenance | licence |
 |---|---|---|---|
 | `10-lineage-forks` | 140 | generated from upstream WayDroid commits | GPL-3.0 |
-| `15-ours` | 11 | hand written here | Apache-2.0 |
+| `15-ours` | 12 | hand written here | Apache-2.0 |
 | `20-upstream` | 54 | upstream `base-patches-36` | GPL-3.0 |
 
 ## GPL-3.0
@@ -39,11 +39,11 @@ projects each carry their own licence.
 
 ## Apache-2.0
 
-`15-ours/` holds the eleven patches written for this repo, plus
+`15-ours/` holds the twelve patches written for this repo, plus
 `waydroid-patches.sh` and everything in `tools/`. Full text in
 `LICENSE-APACHE-2.0`.
 
-These are not derived from any WayDroid commit. Eight fix a defect in a
+These are not derived from any WayDroid commit. Nine fix a defect in a
 project as published by its own upstream, discovered by building:
 
 - `external/rust/hbm/0001` renames a crate dependency that no 23.2 tree defines
@@ -59,6 +59,8 @@ project as published by its own upstream, discovered by building:
 - `hardware/interfaces/0001` annotates `loadHardcodedEffects` with
   `NO_THREAD_SAFETY_ANALYSIS`, since the constructor calls it without holding
   `mMutex`
+- `hardware/interfaces/0002` implements `setNodeCeiling` and `clearNodeCeiling`
+  in the power example HAL, which IPower V6 made pure virtual
 
 The remaining three are not defect fixes but local configuration, also not
 derived from any WayDroid commit:
@@ -90,5 +92,5 @@ forks.
 
 ## Per-patch detail
 
-See `docs/build-fixes.md` for what each of the eleven patches does and why, and
+See `docs/build-fixes.md` for what each of the twelve patches does and why, and
 `TRACKING.md` for the fork deltas.

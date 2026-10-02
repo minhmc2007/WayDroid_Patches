@@ -1,0 +1,64 @@
+From 2c8482bed477a3ba791d97a0ac5c7afc8b13dc8b Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Fri, 2 Oct 2026 17:04:31 +0700
+Subject: [PATCH] power: implement the new node ceiling methods
+
+  frameworks/native/libs/binder/ndk/include_cpp/android/
+    binder_interface_utils.h:104:20: error: allocating an object of abstract
+    class type 'aidl::android::hardware::power::impl::example::Power'
+
+  hardware/interfaces/power/aidl/default/main.cpp:27:54: note:
+    in instantiation of function template specialization
+    'ndk::SharedRefBase::make<...Power>' requested here
+   27 |     std::shared_ptr<Power> vib = ndk::SharedRefBase::make<Power>();
+  out/.../gen/include/aidl/android/hardware/power/IPower.h:95:32: note:
+    unimplemented pure virtual method 'setNodeCeiling' in 'Power'
+  out/.../gen/include/aidl/android/hardware/power/IPower.h:96:32: note:
+    unimplemented pure virtual method 'clearNodeCeiling' in 'Power'
+
+IPower V6 added setNodeCeiling and clearNodeCeiling, so the example HAL
+is abstract. Implement both as no-ops, matching how the neighbouring
+sendComposition methods handle what the example does not model.
+
+Change-Id: Id004c28f8e8a0ce1c25b2a8cba81f665e8e59c80
+---
+ power/aidl/default/Power.cpp | 8 ++++++++
+ power/aidl/default/Power.h   | 3 +++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/power/aidl/default/Power.cpp b/power/aidl/default/Power.cpp
+index 0a9c90f..26a17fd 100644
+--- a/power/aidl/default/Power.cpp
++++ b/power/aidl/default/Power.cpp
+@@ -164,6 +164,14 @@ ndk::ScopedAStatus Power::sendCompositionUpdate(const CompositionUpdate&) {
+     return ndk::ScopedAStatus::ok();
+ }
+ 
++ndk::ScopedAStatus Power::setNodeCeiling(const std::string&, int64_t, int64_t) {
++    return ndk::ScopedAStatus::ok();
++}
++
++ndk::ScopedAStatus Power::clearNodeCeiling(const std::string&) {
++    return ndk::ScopedAStatus::ok();
++}
++
+ }  // namespace example
+ }  // namespace impl
+ }  // namespace power
+diff --git a/power/aidl/default/Power.h b/power/aidl/default/Power.h
+index 118097f..ed10acb 100644
+--- a/power/aidl/default/Power.h
++++ b/power/aidl/default/Power.h
+@@ -52,6 +52,9 @@ class Power : public BnPower {
+                                       GpuHeadroomResult* _aidl_return) override;
+     ndk::ScopedAStatus sendCompositionData(const std::vector<CompositionData>& in_data) override;
+     ndk::ScopedAStatus sendCompositionUpdate(const CompositionUpdate& in_update) override;
++    ndk::ScopedAStatus setNodeCeiling(const std::string& in_nodePath, int64_t in_maxCeiling,
++                                     int64_t in_minFloor) override;
++    ndk::ScopedAStatus clearNodeCeiling(const std::string& in_nodePath) override;
+ 
+   private:
+     std::vector<std::shared_ptr<IPowerHintSession>> mPowerHintSessions;
+-- 
+2.55.0
+
