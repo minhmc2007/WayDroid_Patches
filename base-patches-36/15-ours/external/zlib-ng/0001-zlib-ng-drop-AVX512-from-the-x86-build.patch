@@ -1,0 +1,92 @@
+From 4939086c6c30d1093abd0bd3c9e1554616f17619 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Fri, 2 Oct 2026 21:01:02 +0700
+Subject: [PATCH] zlib-ng: drop AVX512 from the x86 build
+
+  system/lib64/libz.so: db90: push %rbp
+  dbb2: 62 f1 7c 48 11 85 90 vmovups %zmm0,-0x70(%rbp)
+  Signal: 4 (ILL) si_code: ILL_ILLOPN
+
+apexd crashed while mounting APEX, in code reached from deflateCopy.
+x86-64 v1 has no AVX512, so the EVEX-encoded vmovups traps.
+
+libz_defaults is a cc_defaults on libz, so -mavx512f and friends applied
+to every source in the module, not only the dispatched kernels. clang was
+free to autovectorise ordinary code such as deflate.c at -O3, which is
+where the fault came from. The runtime dispatch in functable.c was never
+the problem; it correctly gates every wide kernel on has_avx512_common.
+
+Drop -mavx512f -mavx512dq -mavx512bw -mavx512vl -mavx512vnni, the
+X86_AVX512 and X86_AVX512VNNI defines, and the four arch/x86 sources that
+compile to nothing without them. SSE2 through AVX2, PCLMULQDQ and
+VPCLMULQDQ all stay, so the x86-64 v1 SIMD path is unaffected.
+
+VPCLMULQDQ is left on: it is not AVX512 and Alder Lake has it.
+
+Change-Id: Ie7007ad332b7f1eb081e645b49b0a8b13087b77e
+---
+ Android.bp | 20 --------------------
+ 1 file changed, 20 deletions(-)
+
+diff --git a/Android.bp b/Android.bp
+index acc1aab..ecea040 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -64,8 +64,6 @@ cflags_x86 = [
+     "-DX86_SSE42",
+     "-DX86_PCLMULQDQ_CRC",
+     "-DX86_AVX2",
+-    "-DX86_AVX512",
+-    "-DX86_AVX512VNNI",
+     "-DX86_VPCLMULQDQ_CRC",
+     "-DX86_HAVE_XSAVE_INTRIN",
+     "-DHAVE_CPUID_GNU",
+@@ -206,11 +204,6 @@ cc_defaults {
+                 "-mavx2",
+                 "-mbmi2",
+                 "-mvpclmulqdq",
+-                "-mavx512f",
+-                "-mavx512dq",
+-                "-mavx512bw",
+-                "-mavx512vl",
+-                "-mavx512vnni",
+                 "-mxsave",
+             ],
+             srcs: [
+@@ -229,10 +222,6 @@ cc_defaults {
+                 "arch/x86/compare256_avx2.c",
+                 "arch/x86/slide_hash_avx2.c",
+                 "arch/x86/crc32_vpclmulqdq.c",
+-                "arch/x86/adler32_avx512.c",
+-                "arch/x86/chunkset_avx512.c",
+-                "arch/x86/compare256_avx512.c",
+-                "arch/x86/adler32_avx512_vnni.c",
+             ],
+         },
+         android_x86_64: {
+@@ -244,11 +233,6 @@ cc_defaults {
+                 "-mavx2",
+                 "-mbmi2",
+                 "-mvpclmulqdq",
+-                "-mavx512f",
+-                "-mavx512dq",
+-                "-mavx512bw",
+-                "-mavx512vl",
+-                "-mavx512vnni",
+                 "-mxsave",
+             ],
+             srcs: [
+@@ -267,10 +251,6 @@ cc_defaults {
+                 "arch/x86/compare256_avx2.c",
+                 "arch/x86/slide_hash_avx2.c",
+                 "arch/x86/crc32_vpclmulqdq.c",
+-                "arch/x86/adler32_avx512.c",
+-                "arch/x86/chunkset_avx512.c",
+-                "arch/x86/compare256_avx512.c",
+-                "arch/x86/adler32_avx512_vnni.c",
+             ],
+         },
+         linux_bionic: {
+-- 
+2.55.0
+

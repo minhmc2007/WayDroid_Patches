@@ -3,7 +3,7 @@
 Ten patches, hand written, under Apache-2.0. They sit apart from the GPL-3.0 fork
 deltas on purpose, so Apache-2.0 never appears to cover upstream's work.
 
-Nine fix a defect in a project as its own upstream publishes it. The other three
+Ten fix a defect in a project as its own upstream publishes it. The other three
 are local configuration and touch no upstream code. Every fix was made after a
 build failed, and every commit message quotes the error that prompted it.
 
@@ -18,6 +18,7 @@ build failed, and every commit message quotes the error that prompted it.
 | `external/tensorflow/0001` | add the `neon_2_sse` include dir | `neon_check.h` includes `NEON_2_SSE.h` on x86 |
 | `hardware/interfaces/0001` | annotate `loadHardcodedEffects` | the constructor calls it without `mMutex` held |
 | `hardware/interfaces/0002` | implement `setNodeCeiling`, `clearNodeCeiling` | IPower V6 made both pure virtual |
+| `external/zlib-ng/0001` | drop AVX512 from the x86 build | apexd SIGILL inside `deflateCopy`; x86-64 v1 has no AVX512 |
 
 The remaining three are configuration, not defect fixes:
 
