@@ -1,0 +1,37 @@
+From 588e0443087f75d530068c55672ff1162adfa8cb Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Fri, 2 Oct 2026 16:03:09 +0700
+Subject: [PATCH] audio: annotate loadHardcodedEffects, called unlocked
+
+  hardware/interfaces/audio/aidl/default/EffectFactory.cpp:319:13:
+    error: reading variable 'mIdentitySet' requires holding mutex
+    'mMutex' [-Werror,-Wthread-safety-analysis]
+  319 |             mIdentitySet.insert(std::move(id));
+
+loadHardcodedEffects runs from the constructor, which takes no lock, and
+inserts into mIdentitySet. The other two functions that reach
+mIdentitySet without the lock, openEffectLibrary and
+createIdentityWithConfig, already carry NO_THREAD_SAFETY_ANALYSIS for the
+same reason. Annotate this one the same way.
+
+Change-Id: Iccf48d6f44f4067b8afbcab5882114c6e42775bb
+---
+ audio/aidl/default/EffectFactory.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/audio/aidl/default/EffectFactory.cpp b/audio/aidl/default/EffectFactory.cpp
+index 9b1e442..6003586 100644
+--- a/audio/aidl/default/EffectFactory.cpp
++++ b/audio/aidl/default/EffectFactory.cpp
+@@ -298,7 +298,7 @@ void Factory::getDlSyms_l(DlEntry& entry) {
+     }
+ }
+ 
+-void Factory::loadHardcodedEffects() {
++void Factory::loadHardcodedEffects() NO_THREAD_SAFETY_ANALYSIS {
+     static const char* kAxionFxLibPaths[] = {
+         "/vendor/lib64/soundfx/libaxionfxaidl.so",
+         "/vendor/lib/soundfx/libaxionfxaidl.so"
+-- 
+2.55.0
+
