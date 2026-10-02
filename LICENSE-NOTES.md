@@ -6,7 +6,7 @@ do not bleed into each other.
 | layer | patches | provenance | licence |
 |---|---|---|---|
 | `10-lineage-forks` | 140 | generated from upstream WayDroid commits | GPL-3.0 |
-| `15-ours` | 10 | hand-written here | Apache-2.0 |
+| `15-ours` | 10 | hand written here | Apache-2.0 |
 | `20-upstream` | 54 | upstream `base-patches-36` | GPL-3.0 |
 
 ## GPL-3.0
@@ -57,12 +57,14 @@ project as published by its own upstream, discovered by building:
   the three tflite targets that compile `neon_check.h`, which includes
   `NEON_2_SSE.h` on x86
 
-The remaining two are not defect fixes but local configuration, also not
+The remaining three are not defect fixes but local configuration, also not
 derived from any WayDroid commit:
 
 - `device/waydroid/waydroid/0001` sets `AXION_MAINTAINER` and
   `AXION_PROCESSOR`, which AxionOS's own `device/axion/common/config/version.mk`
   exports as `persist.sys.axion_maintainer` and `persist.sys.axion_cpu_info`
+- `packages/apps/FaceUnlock/0001` drops four Megvii prebuilts from a `required:`
+  list, since they carry `android_arm64` srcs only
 - `build/make/0001` comments out the `setup_ccache` call in `envsetup.sh`, which
   otherwise exports `USE_CCACHE=1` on every build
 
@@ -71,5 +73,5 @@ Apache-2.0 does not appear to cover upstream's GPL-3.0 work.
 
 ## Per-patch detail
 
-See `docs/build-fixes.md` for what each of the seven build fixes does and why,
-and `TRACKING.md` for the fork deltas.
+See `docs/build-fixes.md` for what each of the ten patches does and why, and
+`TRACKING.md` for the fork deltas.
