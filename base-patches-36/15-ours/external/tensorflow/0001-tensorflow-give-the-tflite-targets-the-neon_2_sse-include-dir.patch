@@ -1,4 +1,4 @@
-From 6281265d4622f298d38632db02702d55eeb1c39e Mon Sep 17 00:00:00 2001
+From a25fb6dbe643eabf0bb36333d26d18d438e10b2a Mon Sep 17 00:00:00 2001
 From: minhmc2007 <quangminh21072010@gmail.com>
 Date: Fri, 2 Oct 2026 11:03:36 +0700
 Subject: [PATCH] tensorflow: give the tflite targets the neon_2_sse include
@@ -16,65 +16,55 @@ Subject: [PATCH] tensorflow: give the tflite targets the neon_2_sse include
 NEON_2_SSE.h is Intel's shim, reimplementing the ARM NEON intrinsics on
 top of SSE so the optimized kernels keep their fast path on x86.
 neon_check.h includes it whenever __SSE4_1__ is defined and
-TF_LITE_DISABLE_X86_NEON is not, which describes every x86_64 compile of
-these sources. The header is present at external/neon_2_sse, so what is
-missing is an include path.
+TF_LITE_DISABLE_X86_NEON is not, and the file is present at
+external/neon_2_sse, so what is missing is an include path.
 
 171 sources reach optimized_ops.h, so the include dir goes on the targets
-that compile any of them:
+compiling any of them: libtflite_kernel_utils and libtflite_kernels, which
+had none, and libtensorflowlite_xnnpack_jni, which had XNNPACK's only.
 
-  libtflite_kernel_utils           had no include_dirs at all
-  libtflite_kernels               had none either
-  libtensorflowlite_xnnpack_jni   had XNNPACK's, without neon_2_sse
-
-Reaching the header is not enough on its own. NEON_2_SSE.h declares its
-intrinsics as static inline __attribute__((gnu_inline)), and Clang 10
-made that an error in C++:
+Reaching the header is not enough. NEON_2_SSE.h declares its intrinsics
+with __gnu_inline__, which Clang 10 made an error in C++:
 
   external/neon_2_sse/NEON_2_SSE.h:2390:9: error: 'gnu_inline' attribute
     without 'extern' in C++ treated as externally available, this
     changed in Clang 10 [-Werror,-Wgnu-inline-cpp-without-extern]
 
-tflite_defaults is the only place in this tree that sets a bare -Werror,
-so add -Wno-gnu-inline-cpp-without-extern there. libtflite_flex_delegate
-already carries that flag for the same reason. The global Soong Cflags
-set only -Werror=<specific>, and do not enable this warning, so the
-xnnpack target needs nothing.
+That needs -Wno-gnu-inline-cpp-without-extern in two places, not one.
+out/verbose.log.gz named libtensorflowlite_xnnpack_jni as the failing
+target, and it does not use tflite_defaults, so the flag has to be
+repeated on it. libtflite_flex_delegate already carries it.
 
 libtflite_static also compiles neon_tensor_utils.cc, but it is defined in
 tensorflow/lite/tflite_static.bp, and Soong parses only files named
 Android.bp; that file is absent from the 22 entries under
 external/tensorflow in out/.module_paths/Android.bp.list.
 
-TF_LITE_DISABLE_X86_NEON, which tflite_defaults already sets, would make
-the build pass by dropping to the Portable kernels. Left the fast path
-alone.
+TF_LITE_DISABLE_X86_NEON, already set here, would pass by dropping to the
+Portable kernels. Left the fast path alone.
 
 205 patches, 0 conflicts.
 
-Change-Id: I94ff2540935fa7918c87799161f3de85b9c788b6
+Change-Id: Ie977774c7201868836b42bd7f8bb7a7c56d69085
 ---
  tensorflow/lite/Android.bp         | 11 +++++++++++
  tensorflow/lite/kernels/Android.bp | 12 ++++++++++++
  2 files changed, 23 insertions(+)
 
 diff --git a/tensorflow/lite/Android.bp b/tensorflow/lite/Android.bp
-index 6fb08b62..1693b574 100644
+index 6fb08b62..13c31b22 100644
 --- a/tensorflow/lite/Android.bp
 +++ b/tensorflow/lite/Android.bp
-@@ -33,6 +33,11 @@ cc_defaults {
+@@ -33,6 +33,8 @@ cc_defaults {
          "-DTF_LITE_DISABLE_X86_NEON",
          "-Werror",
          "-Wno-unused-parameter",
-+        // NEON_2_SSE.h declares its intrinsics with __gnu_inline__, which
-+        // Clang 10 and later reject in C++ without extern. tflite_defaults
-+        // sets -Werror, so without this the warning is fatal. The flex
-+        // delegate target carries the same flag for the same reason.
++        // NEON_2_SSE.h uses __gnu_inline__, an error in C++ since Clang 10.
 +        "-Wno-gnu-inline-cpp-without-extern",
      ],
      shared_libs: [
          "liblog",
-@@ -259,6 +264,12 @@ cc_library_shared {
+@@ -259,6 +261,12 @@ cc_library_shared {
      include_dirs: [
          "external/XNNPACK/include",
          "external/XNNPACK/src",
@@ -87,6 +77,16 @@ index 6fb08b62..1693b574 100644
      ],
      static_libs: [
          "libruy_static",
+@@ -273,6 +281,9 @@ cc_library_shared {
+         "-Wno-unused-function",
+         "-Wno-unused-parameter",
+         "-Wno-missing-field-initializers",
++        // NEON_2_SSE.h uses __gnu_inline__, an error in C++ since Clang 10.
++        // This target skips tflite_defaults, so repeat the flag there.
++        "-Wno-gnu-inline-cpp-without-extern",
+     ],
+     ldflags: [
+         "-Wl,--undefined-version",
 diff --git a/tensorflow/lite/kernels/Android.bp b/tensorflow/lite/kernels/Android.bp
 index 52377943..452edea4 100644
 --- a/tensorflow/lite/kernels/Android.bp
