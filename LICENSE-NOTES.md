@@ -71,6 +71,20 @@ derived from any WayDroid commit:
 They are kept in a separate layer from the GPL material precisely so that
 Apache-2.0 does not appear to cover upstream's GPL-3.0 work.
 
+Two of these ten patch a project our own manifest adds from WayDroid, so they
+are derivative works and inherit GPL-3.0 no matter who wrote the hunk. That is
+fine to place in this layer, since Apache-2.0 is one-way compatible with
+GPL-3.0: the combined work can be distributed under GPL-3.0.
+
+- `prebuilts/mesa-tools/0001`, where the project ships no licence file of its
+  own and is taken from the WayDroid org
+- `device/waydroid/waydroid/0001`, a WayDroid-ATV project, same situation
+
+The rest patch files that are permissively licensed or unowned: `hbm` is MIT,
+`minigbm` is BSD-3, `mesa3d` is MIT, `android-crates-io` is Apache-2.0 AOSP, and
+`build/make`, `external/tensorflow` and `packages/apps/FaceUnlock` are AxionOS
+forks.
+
 ## Per-patch detail
 
 See `docs/build-fixes.md` for what each of the ten patches does and why, and

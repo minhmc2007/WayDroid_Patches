@@ -1,4 +1,4 @@
-From a25fb6dbe643eabf0bb36333d26d18d438e10b2a Mon Sep 17 00:00:00 2001
+From e7415d1b1c45a92b06f52f49355b26071ce0fe0b Mon Sep 17 00:00:00 2001
 From: minhmc2007 <quangminh21072010@gmail.com>
 Date: Fri, 2 Oct 2026 11:03:36 +0700
 Subject: [PATCH] tensorflow: give the tflite targets the neon_2_sse include
@@ -14,10 +14,8 @@ Subject: [PATCH] tensorflow: give the tflite targets the neon_2_sse include
     'NEON_2_SSE.h' file not found
 
 NEON_2_SSE.h is Intel's shim, reimplementing the ARM NEON intrinsics on
-top of SSE so the optimized kernels keep their fast path on x86.
-neon_check.h includes it whenever __SSE4_1__ is defined and
-TF_LITE_DISABLE_X86_NEON is not, and the file is present at
-external/neon_2_sse, so what is missing is an include path.
+top of SSE so the optimized kernels keep their fast path on x86. The file
+is present at external/neon_2_sse, so what is missing is an include path.
 
 171 sources reach optimized_ops.h, so the include dir goes on the targets
 compiling any of them: libtflite_kernel_utils and libtflite_kernels, which
@@ -30,10 +28,10 @@ with __gnu_inline__, which Clang 10 made an error in C++:
     without 'extern' in C++ treated as externally available, this
     changed in Clang 10 [-Werror,-Wgnu-inline-cpp-without-extern]
 
-That needs -Wno-gnu-inline-cpp-without-extern in two places, not one.
-out/verbose.log.gz named libtensorflowlite_xnnpack_jni as the failing
-target, and it does not use tflite_defaults, so the flag has to be
-repeated on it. libtflite_flex_delegate already carries it.
+That needs -Wno-gnu-inline-cpp-without-extern in two places. The failing
+target was libtensorflowlite_xnnpack_jni, which does not use
+tflite_defaults, so the flag has to be repeated on it.
+libtflite_flex_delegate already carries it.
 
 libtflite_static also compiles neon_tensor_utils.cc, but it is defined in
 tensorflow/lite/tflite_static.bp, and Soong parses only files named
@@ -43,16 +41,14 @@ external/tensorflow in out/.module_paths/Android.bp.list.
 TF_LITE_DISABLE_X86_NEON, already set here, would pass by dropping to the
 Portable kernels. Left the fast path alone.
 
-205 patches, 0 conflicts.
-
-Change-Id: Ie977774c7201868836b42bd7f8bb7a7c56d69085
+Change-Id: I5b2d105f28757094b8a7cd8c447d12fcc5c4c99c
 ---
- tensorflow/lite/Android.bp         | 11 +++++++++++
- tensorflow/lite/kernels/Android.bp | 12 ++++++++++++
- 2 files changed, 23 insertions(+)
+ tensorflow/lite/Android.bp         |  6 ++++++
+ tensorflow/lite/kernels/Android.bp | 10 ++++++++++
+ 2 files changed, 16 insertions(+)
 
 diff --git a/tensorflow/lite/Android.bp b/tensorflow/lite/Android.bp
-index 6fb08b62..13c31b22 100644
+index 6fb08b62..a27832b8 100644
 --- a/tensorflow/lite/Android.bp
 +++ b/tensorflow/lite/Android.bp
 @@ -33,6 +33,8 @@ cc_defaults {
@@ -64,40 +60,33 @@ index 6fb08b62..13c31b22 100644
      ],
      shared_libs: [
          "liblog",
-@@ -259,6 +261,12 @@ cc_library_shared {
+@@ -259,6 +261,8 @@ cc_library_shared {
      include_dirs: [
          "external/XNNPACK/include",
          "external/XNNPACK/src",
-+        // delegates/xnnpack/quantization_util.cc includes optimized_ops.h,
-+        // which reaches kernels/internal/optimized/neon_check.h. That
-+        // includes NEON_2_SSE.h whenever __SSE4_1__ is defined, so the
-+        // x86_64 build needs it. Setting TF_LITE_DISABLE_X86_NEON instead
-+        // would compile, but only by dropping to the Portable kernels.
++        // quantization_util.cc reaches neon_check.h, which needs this on x86.
 +        "external/neon_2_sse",
      ],
      static_libs: [
          "libruy_static",
-@@ -273,6 +281,9 @@ cc_library_shared {
+@@ -273,6 +277,8 @@ cc_library_shared {
          "-Wno-unused-function",
          "-Wno-unused-parameter",
          "-Wno-missing-field-initializers",
-+        // NEON_2_SSE.h uses __gnu_inline__, an error in C++ since Clang 10.
-+        // This target skips tflite_defaults, so repeat the flag there.
++        // NEON_2_SSE.h uses __gnu_inline__. This target skips tflite_defaults.
 +        "-Wno-gnu-inline-cpp-without-extern",
      ],
      ldflags: [
          "-Wl,--undefined-version",
 diff --git a/tensorflow/lite/kernels/Android.bp b/tensorflow/lite/kernels/Android.bp
-index 52377943..452edea4 100644
+index 52377943..34983249 100644
 --- a/tensorflow/lite/kernels/Android.bp
 +++ b/tensorflow/lite/kernels/Android.bp
-@@ -47,6 +47,13 @@ cc_library_static {
+@@ -47,6 +47,11 @@ cc_library_static {
      static_libs: [
          "libruy_static",
      ],
-+    // internal/optimized/neon_check.h includes NEON_2_SSE.h on x86, which
-+    // re-implements the ARM intrinsics with SSE. This target had no
-+    // include_dirs at all.
++    // neon_tensor_utils.cc needs NEON_2_SSE.h, which emulates NEON with SSE.
 +    include_dirs: [
 +        "external/gemmlowp",
 +        "external/neon_2_sse",
@@ -105,7 +94,7 @@ index 52377943..452edea4 100644
      cflags: [
          "-Wno-extern-c-compat",
          "-Wno-sign-compare",
-@@ -183,6 +190,11 @@ cc_library_static {
+@@ -183,6 +188,11 @@ cc_library_static {
      static_libs: [
          "libfft2d",
      ],

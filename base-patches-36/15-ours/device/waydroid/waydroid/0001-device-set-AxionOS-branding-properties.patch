@@ -1,37 +1,30 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 738ea6afde0cfa6de0fd4fe967f202985bd4e03b Mon Sep 17 00:00:00 2001
 From: minhmc2007 <quangminh21072010@gmail.com>
-Date: Thu, 1 Oct 2026 14:32:29 +0700
+Date: Fri, 2 Oct 2026 13:13:56 +0700
 Subject: [PATCH] device: set AxionOS branding properties
 
-Sets AXION_MAINTAINER and AXION_PROCESSOR, which
-device/axion/common/config/version.mk exports as
-persist.sys.axion_maintainer and persist.sys.axion_cpu_info. About phone
-reads the maintainer through BannerPreferenceController.kt, which
-replaces "_" with " ".
+Sets AXION_MAINTAINER and AXION_PROCESSOR. AxionOS's own
+device/axion/common/config/version.mk exports them as
+persist.sys.axion_maintainer and persist.sys.axion_cpu_info, which About
+phone reads through BannerPreferenceController.kt. That class replaces
+"_" with " " when displaying them.
 
-Placed above the PRODUCT_IS_ATV branch so the values are set before the
-inherit-product chain that reaches version.mk evaluates them. Both the
-TV and the tablet inherit path reach it: common_full_tv.mk ->
-common_tv.mk -> common.mk -> defaults_common.mk, and
-common_full_tablet_wifionly.mk -> common_mobile_full.mk ->
-common_mobile.mk -> common.mk -> defaults_common.mk.
+Placed above the PRODUCT_IS_ATV branch, because inherit-product is
+deferred and both the TV and the tablet chain reach version.mk after
+device.mk is parsed. Setting these lower down would leave them empty.
 ---
- device.mk | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ device.mk | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/device.mk b/device.mk
-index dbcee30..aaa8589 100644
+index dbcee30..ea96038 100644
 --- a/device.mk
 +++ b/device.mk
-@@ -14,6 +14,14 @@
+@@ -14,6 +14,10 @@
  # limitations under the License.
  #
  
-+# AxionOS branding. Read by device/axion/common/config/version.mk, which
-+# exports them as persist.sys.axion_maintainer and persist.sys.axion_cpu_info
-+# for "About phone". Must be set before the inherit-product chain below,
-+# because that chain is what evaluates version.mk.
-+# BannerPreferenceController.kt replaces "_" with " " when displaying them.
++# Read by device/axion/common/config/version.mk. Must precede the inherits.
 +AXION_MAINTAINER := minhmc2077
 +AXION_PROCESSOR := Generic X86_64
 +

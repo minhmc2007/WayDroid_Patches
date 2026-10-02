@@ -1,4 +1,4 @@
-From aaa52f8e1e36e2673344be4164d149733a3f3cb0 Mon Sep 17 00:00:00 2001
+From 10cf1a2e0fdcd973bfc3ff7e269e90ab6aec4c33 Mon Sep 17 00:00:00 2001
 From: minhmc2007 <quangminh21072010@gmail.com>
 Date: Thu, 1 Oct 2026 16:33:25 +0700
 Subject: [PATCH] FaceUnlock: drop the arm64-only Megvii prebuilts from
@@ -14,36 +14,29 @@ no variant on x86_64 and kati fails the required-deps check at
 main.mk:497.
 
 TARGET_FACE_UNLOCK_SUPPORTED cannot reach this. It keeps FaceUnlock out
-of PRODUCT_PACKAGES via packages/apps/FaceUnlock/common.mk, but
-frameworks/base/services/core statically requires
-vendor.aospa.biometrics.face, whose source lives in this project. That
-keeps the namespace in ALL_MODULES regardless of what is installed, and
-the check at main.mk:439 iterates ALL_MODULES, so the deps are validated
-even when the app is not built.
+of PRODUCT_PACKAGES, but frameworks/base/services/core statically
+requires vendor.aospa.biometrics.face, whose source lives in this
+project. That keeps the namespace in ALL_MODULES, and the check at
+main.mk:439 iterates ALL_MODULES, so the deps are validated whether or
+not the app is installed.
 
 The four modules stay defined below, just unreferenced. Gating the
 services/core dependency on a product variable would be the real fix.
-
-205 patches, 0 conflicts.
 ---
- Android.bp | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ Android.bp | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/Android.bp b/Android.bp
-index 82a72ca..46e8491 100644
+index 82a72ca..f3bed18 100644
 --- a/Android.bp
 +++ b/Android.bp
-@@ -25,11 +25,14 @@ android_app {
+@@ -25,11 +25,10 @@ android_app {
          "vendor.aospa.biometrics.face.impl",
      ],
  
-+    // libFaceDetectCA, libmegface_faceunlock, libMegviiUnlock and
-+    // libMegviiUnlock-jni-1.2 are still defined below, but they declare
-+    // only android_arm64 srcs. Requiring them on any other arch fails kati
-+    // with "requires non-existent TARGET module" even though this app is
-+    // not installed, because frameworks/base hardcodes a dependency on
-+    // vendor.aospa.biometrics.face, which keeps the namespace -- and so
-+    // this module's required deps -- in ALL_MODULES.
++    // The Megvii prebuilts below are android_arm64 only, and frameworks/base
++    // hardcodes a dependency on this namespace, so kati checks them here on
++    // every arch even when this app is not installed.
      required: [
 -        "libFaceDetectCA",
 -        "libmegface_faceunlock",

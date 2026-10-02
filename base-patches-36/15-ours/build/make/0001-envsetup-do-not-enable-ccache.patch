@@ -1,4 +1,4 @@
-From 1b1b725946f224de3714b37924eb1d41c99a99c4 Mon Sep 17 00:00:00 2001
+From 6b493c37c09a942b5bf8e34e92873aa44f5b97c3 Mon Sep 17 00:00:00 2001
 From: minhmc2007 <quangminh21072010@gmail.com>
 Date: Fri, 2 Oct 2026 05:35:12 +0700
 Subject: [PATCH] envsetup: do not enable ccache
@@ -11,28 +11,24 @@ wanted. It also sets CCACHE_MAXSIZE itself, but a cache left at its
 default is unbounded.
 
 Commenting out the call rather than the body leaves USE_CCACHE unset, so
-USE_CCACHE=1 in the environment still works for anyone who wants it, and
-re-enabling is deleting one character.
+USE_CCACHE=1 in the environment still works, and re-enabling is deleting
+one character.
 
-205 patches, 0 conflicts.
-
-Change-Id: I130dbd6fd172dc872402342b379c6212db273df3
+Change-Id: If718cc565f46aaebdda7184fe12422e36237cd49
 ---
- envsetup.sh | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ envsetup.sh | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/envsetup.sh b/envsetup.sh
-index db06cb6..d18c3d2 100644
+index db06cb6..2bdc2ec 100644
 --- a/envsetup.sh
 +++ b/envsetup.sh
-@@ -3496,7 +3496,10 @@ function skipGlobs() {
+@@ -3496,7 +3496,8 @@ function skipGlobs() {
  }
  
  setup_keys
 -setup_ccache
-+# setup_ccache: ccache is off. It defaults USE_CCACHE=1 and grows without
-+# bound, which is a lot of writes for a disk that does not need it. Uncomment
-+# if you want it back.
++# ccache off, it defaults USE_CCACHE=1 and grows without bound.
 +#setup_ccache
  validate_current_shell
  set_global_paths
