@@ -18,7 +18,7 @@ build failed, and every commit message quotes the error that prompted it.
 | `external/tensorflow/0001` | add the `neon_2_sse` include dir | `neon_check.h` includes `NEON_2_SSE.h` on x86 |
 | `hardware/interfaces/0001` | annotate `loadHardcodedEffects` | the constructor calls it without `mMutex` held |
 | `hardware/interfaces/0002` | implement `setNodeCeiling`, `clearNodeCeiling` | IPower V6 made both pure virtual |
-| `external/zlib-ng/0001` | drop AVX512 from the x86 build | apexd SIGILL inside `deflateCopy`; x86-64 v1 has no AVX512 |
+| `external/zlib-ng/0001` | drop AVX512 and AVX2 from the x86 build | apexd SIGILL in `deflateCopy`, then SIGSEGV in `chunkmemset_avx2` |
 
 The remaining three are configuration, not defect fixes:
 
@@ -141,9 +141,36 @@ before selecting the kernel, so nothing is lost. `crc32_pclmulqdq.c` is
 unaffected: `crc32_fold_pclmulqdq_tpl.h` only reaches the zmm template when
 `X86_VPCLMULQDQ` is set, and only `crc32_vpclmulqdq.c` sets it.
 
-`X86_VPCLMULQDQ_CRC` is kept because VPCLMULQDQ is not AVX512 and Alder Lake has
-it. The resulting x86-64 v1 SIMD path is SSE2 through AVX2 plus PCLMULQDQ and
-VPCLMULQDQ, so it works on any x86_64 CPU rather than only on ones with AVX512.
+With AVX512 gone, apexd got further and then faulted a second time, SIGSEGV
+after a 210 s stall:
+
+```
+#0 chunkmemset_avx2(unsigned char*, unsigned char*, unsigned int) +0x24a
+#1 inflate +0xe84
+2303a: c5 fd 6f 04 07  vmovdqa (%rdi,%rax,1),%ymm0
+```
+
+`vmovdqa` is an aligned 256-bit load, so a 32-byte-misaligned address raises
+`#GP`. `functable.c` dispatches the AVX2 kernels on the AVX2 gate alone rather
+than behind `has_avx512_common`, so that kernel was already selected before the
+first fix and apexd had simply died earlier.
+
+`-mvpclmulqdq` was the quiet cause of the 256-bit codegen. It implies
+`__AVX__` in clang, so leaving it in permitted VEX.256 across every translation
+unit, including the generic C. Since the vpclmulqdq CRC kernel is already
+compiled out, the flag was dead config whose only effect was to allow the
+faulting loads, so it and `X86_VPCLMULQDQ_CRC` go as well.
+
+`slide_hash_avx2.c` carries no preprocessor guard at all, so unlike the other
+three it had to leave `srcs` rather than rely on `X86_AVX2` compiling it out.
+
+Kept: SSE2 through SSE4.2, PCLMULQDQ, BMI2 and XSAVE. PCLMULQDQ and BMI2 do not
+imply AVX in clang, so the 128-bit path stays clear of 256-bit codegen and works
+on any x86_64 CPU.
+
+Verified by compiling all 41 x86_64 libz sources with the module's exact flags
+under `-Werror`, then disassembling every object: 0 `ymm`, 0 `zmm`, 0 mask
+registers and 0 `vmovdqa` across the whole module.
 
 ## Regenerating
 

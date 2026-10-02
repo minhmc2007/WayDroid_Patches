@@ -1,0 +1,185 @@
+From 29e83f6606252c1e05f2bd37bf171f5f984d2d18 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Fri, 2 Oct 2026 21:01:02 +0700
+Subject: [PATCH] zlib-ng: drop AVX512 and AVX2 from the x86 build
+
+Two faults in the x86 SIMD, both confirmed from the built artifacts.
+
+First was SIGILL. apexd died mounting APEX at signal 4 (ILL_ILLOPN):
+
+  system/lib64/libz.so: dbb2: 62 f1 7c 48 11 85 90  vmovups %zmm0,-0x70(%rbp)
+
+libz_defaults is a cc_defaults on libz, so -mavx512f and friends applied
+to every source in the module rather than only the dispatched kernels. At
+-O3 clang autovectorised ordinary code such as deflate.c, which is where
+the EVEX vmovups came from. The functable dispatch was never at fault and
+still gates every wide kernel on has_avx512_common.
+
+Removing those flags exposed a second fault, SIGSEGV after a 210 s stall:
+
+  #0 chunkmemset_avx2(unsigned char*, unsigned char*, unsigned int) +0x24a
+  #1 inflate +0xe84
+  2303a: c5 fd 6f 04 07  vmovdqa (%rdi,%rax,1),%ymm0
+
+vmovdqa is an aligned 256-bit load, so a 32-byte-misaligned address raises
+#GP. functable.c dispatches the AVX2 kernels on the AVX2 gate alone, not
+behind has_avx512_common, so this kernel was already selected before the
+first fix; apexd simply died earlier and never reached inflate.
+
+-mvpclmulqdq turned out to be the quiet cause. It implies __AVX__ in clang,
+so leaving it in re-enabled VEX.256 codegen across every translation unit,
+including the generic C. The vpclmulqdq CRC kernel itself is already
+compiled out because its folds are zmm-only, so the flag was dead config
+whose only effect was to permit the faulting 256-bit loads. Removed it
+along with X86_VPCLMULQDQ_CRC.
+
+Gone now: the five -mavx512* flags, -mavx2, -mvpclmulqdq, the X86_AVX512,
+X86_AVX512VNNI, X86_AVX2 and X86_VPCLMULQDQ_CRC defines, the four arch/x86
+AVX512 sources and the four AVX2 sources. slide_hash_avx2.c carries no
+preprocessor guard at all, so it had to leave srcs rather than rely on
+X86_AVX2 compiling it out.
+
+The vpclmulqdq kernel needed a source guard rather than a flag change.
+X86_VPCLMULQDQ_CRC also gates its declarations in x86_functions.h and its
+dispatch in functable.c, so adding && defined(X86_AVX512) to all three
+switches it off while leaving those files free of further edits.
+crc32_fold_pclmulqdq_tpl.h is built entirely from _mm512_* intrinsics and
+cannot compile without avx512f, so X86_VPCLMULQDQ_CRC alone was never a
+buildable combination. crc32_pclmulqdq.c is unaffected: it only reaches the
+zmm template when X86_VPCLMULQDQ is set, which only crc32_vpclmulqdq.c does.
+
+Kept: SSE2 through SSE4.2, PCLMULQDQ, BMI2 and XSAVE. PCLMULQDQ and BMI2 do
+not imply AVX in clang, so the 128-bit path stays free of 256-bit codegen.
+
+Verified by compiling all 41 x86_64 libz sources with the module's exact
+flags under -Werror, then disassembling every object: 0 ymm, 0 zmm, 0 mask
+registers and 0 vmovdqa across the whole module.
+
+Change-Id: I03ee50219383fe0e4bc4b54dd69a8e03d99e5ae1
+---
+ Android.bp                  | 34 ----------------------------------
+ arch/x86/crc32_vpclmulqdq.c |  3 ++-
+ arch/x86/x86_functions.h    |  2 +-
+ functable.c                 |  2 +-
+ 4 files changed, 4 insertions(+), 37 deletions(-)
+
+diff --git a/Android.bp b/Android.bp
+index acc1aab..2abf193 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -63,10 +63,6 @@ cflags_x86 = [
+     "-DX86_SSE41",
+     "-DX86_SSE42",
+     "-DX86_PCLMULQDQ_CRC",
+-    "-DX86_AVX2",
+-    "-DX86_AVX512",
+-    "-DX86_AVX512VNNI",
+-    "-DX86_VPCLMULQDQ_CRC",
+     "-DX86_HAVE_XSAVE_INTRIN",
+     "-DHAVE_CPUID_GNU",
+ ]
+@@ -203,14 +199,7 @@ cc_defaults {
+                 "-msse4.1",
+                 "-msse4.2",
+                 "-mpclmul",
+-                "-mavx2",
+                 "-mbmi2",
+-                "-mvpclmulqdq",
+-                "-mavx512f",
+-                "-mavx512dq",
+-                "-mavx512bw",
+-                "-mavx512vl",
+-                "-mavx512vnni",
+                 "-mxsave",
+             ],
+             srcs: [
+@@ -224,15 +213,7 @@ cc_defaults {
+                 "arch/x86/chorba_sse41.c",
+                 "arch/x86/adler32_sse42.c",
+                 "arch/x86/crc32_pclmulqdq.c",
+-                "arch/x86/adler32_avx2.c",
+-                "arch/x86/chunkset_avx2.c",
+-                "arch/x86/compare256_avx2.c",
+-                "arch/x86/slide_hash_avx2.c",
+                 "arch/x86/crc32_vpclmulqdq.c",
+-                "arch/x86/adler32_avx512.c",
+-                "arch/x86/chunkset_avx512.c",
+-                "arch/x86/compare256_avx512.c",
+-                "arch/x86/adler32_avx512_vnni.c",
+             ],
+         },
+         android_x86_64: {
+@@ -241,14 +222,7 @@ cc_defaults {
+                 "-msse4.1",
+                 "-msse4.2",
+                 "-mpclmul",
+-                "-mavx2",
+                 "-mbmi2",
+-                "-mvpclmulqdq",
+-                "-mavx512f",
+-                "-mavx512dq",
+-                "-mavx512bw",
+-                "-mavx512vl",
+-                "-mavx512vnni",
+                 "-mxsave",
+             ],
+             srcs: [
+@@ -262,15 +236,7 @@ cc_defaults {
+                 "arch/x86/chorba_sse41.c",
+                 "arch/x86/adler32_sse42.c",
+                 "arch/x86/crc32_pclmulqdq.c",
+-                "arch/x86/adler32_avx2.c",
+-                "arch/x86/chunkset_avx2.c",
+-                "arch/x86/compare256_avx2.c",
+-                "arch/x86/slide_hash_avx2.c",
+                 "arch/x86/crc32_vpclmulqdq.c",
+-                "arch/x86/adler32_avx512.c",
+-                "arch/x86/chunkset_avx512.c",
+-                "arch/x86/compare256_avx512.c",
+-                "arch/x86/adler32_avx512_vnni.c",
+             ],
+         },
+         linux_bionic: {
+diff --git a/arch/x86/crc32_vpclmulqdq.c b/arch/x86/crc32_vpclmulqdq.c
+index cad35b1..bea36fa 100644
+--- a/arch/x86/crc32_vpclmulqdq.c
++++ b/arch/x86/crc32_vpclmulqdq.c
+@@ -3,7 +3,8 @@
+  * For conditions of distribution and use, see copyright notice in zlib.h
+  */
+ 
+-#ifdef X86_VPCLMULQDQ_CRC
++/* The zmm folds in crc32_fold_vpclmulqdq_tpl.h need avx512f, so this kernel is unusable without X86_AVX512. */
++#if defined(X86_VPCLMULQDQ_CRC) && defined(X86_AVX512)
+ 
+ #define X86_VPCLMULQDQ
+ #define CRC32_FOLD_COPY  crc32_fold_vpclmulqdq_copy
+diff --git a/arch/x86/x86_functions.h b/arch/x86/x86_functions.h
+index 5d9065e..46e00a4 100644
+--- a/arch/x86/x86_functions.h
++++ b/arch/x86/x86_functions.h
+@@ -80,7 +80,7 @@ void     crc32_fold_pclmulqdq(crc32_fold *crc, const uint8_t *src, size_t len, u
+ uint32_t crc32_fold_pclmulqdq_final(crc32_fold *crc);
+ uint32_t crc32_pclmulqdq(uint32_t crc32, const uint8_t *buf, size_t len);
+ #endif
+-#ifdef X86_VPCLMULQDQ_CRC
++#if defined(X86_VPCLMULQDQ_CRC) && defined(X86_AVX512)
+ uint32_t crc32_fold_vpclmulqdq_reset(crc32_fold *crc);
+ void     crc32_fold_vpclmulqdq_copy(crc32_fold *crc, uint8_t *dst, const uint8_t *src, size_t len);
+ void     crc32_fold_vpclmulqdq(crc32_fold *crc, const uint8_t *src, size_t len, uint32_t init_crc);
+diff --git a/functable.c b/functable.c
+index 489399c..ec699c2 100644
+--- a/functable.c
++++ b/functable.c
+@@ -207,7 +207,7 @@ static int init_functable(void) {
+     }
+ #endif
+     // X86 - VPCLMULQDQ
+-#ifdef X86_VPCLMULQDQ_CRC
++#if defined(X86_VPCLMULQDQ_CRC) && defined(X86_AVX512)
+     if (cf.x86.has_pclmulqdq && cf.x86.has_avx512_common && cf.x86.has_vpclmulqdq) {
+         ft.crc32 = &crc32_vpclmulqdq;
+         ft.crc32_fold = &crc32_fold_vpclmulqdq;
+-- 
+2.55.0
+
