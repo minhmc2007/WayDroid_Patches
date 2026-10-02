@@ -117,6 +117,34 @@ Dropping the four entries is the smallest change that works. Gating the
 `frameworks/base` dependency on a product variable would be the proper fix, and
 would also let a target without the HAL skip the namespace entirely.
 
+## The zlib-ng entry needs a flag change and a source change
+
+AxionOS swaps AOSP zlib out for zlib-ng (`axion.xml:56` removes
+`external/zlib`, `axion.xml:199` adds `external/zlib-ng`). `libz_defaults` is a
+`cc_defaults` on `libz`, so the five `-mavx512*` flags it carried applied to every
+source in the module, not only the dispatched kernels. At `-O3` clang
+autovectorised ordinary code such as `deflate.c`, which is where the EVEX
+`vmovups %zmm0` came from, and apexd died with `ILL_ILLOPN` mounting APEX. The
+`functable.c` dispatch was never at fault and still gates every wide kernel on
+`has_avx512_common`.
+
+The flags, the `X86_AVX512` and `X86_AVX512VNNI` defines and the four `arch/x86`
+sources come out of `Android.bp`. The vpclmulqdq CRC kernel cannot follow that
+route, because its source guard is `X86_VPCLMULQDQ_CRC`, which is also what
+gates its declarations in `x86_functions.h` and its dispatch in `functable.c`.
+Dropping the define would work but edits `Android.bp` again, so the guard gains
+`&& defined(X86_AVX512)` instead and `Android.bp` stays untouched.
+`crc32_fold_vpclmulqdq_tpl.h` is built entirely from `_mm512_*` intrinsics and
+cannot compile without `avx512f`, so `X86_VPCLMULQDQ_CRC` alone is a combination
+that was never buildable. `functable.c` already required `has_avx512_common`
+before selecting the kernel, so nothing is lost. `crc32_pclmulqdq.c` is
+unaffected: `crc32_fold_pclmulqdq_tpl.h` only reaches the zmm template when
+`X86_VPCLMULQDQ` is set, and only `crc32_vpclmulqdq.c` sets it.
+
+`X86_VPCLMULQDQ_CRC` is kept because VPCLMULQDQ is not AVX512 and Alder Lake has
+it. The resulting x86-64 v1 SIMD path is SSE2 through AVX2 plus PCLMULQDQ and
+VPCLMULQDQ, so it works on any x86_64 CPU rather than only on ones with AVX512.
+
 ## Regenerating
 
 The fork deltas sit in `10-lineage-forks` and these sit in `15-ours`, so each

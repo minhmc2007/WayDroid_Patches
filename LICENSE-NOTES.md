@@ -62,8 +62,8 @@ project as published by its own upstream, discovered by building:
 - `hardware/interfaces/0002` implements `setNodeCeiling` and `clearNodeCeiling`
   in the power example HAL, which IPower V6 made pure virtual
 - `external/zlib-ng/0001` drops the AVX512 flags, defines and sources from the
-  x86 build, since x86-64 v1 has no AVX512 and apexd was dying with SIGILL
-  inside `deflateCopy`
+  x86 build, and gates the vpclmulqdq CRC kernel on `X86_AVX512`, since
+  x86-64 v1 has no AVX512 and apexd was dying with SIGILL inside `deflateCopy`
 
 The remaining three are not defect fixes but local configuration, also not
 derived from any WayDroid commit:

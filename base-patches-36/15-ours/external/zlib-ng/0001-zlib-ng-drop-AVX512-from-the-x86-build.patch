@@ -1,32 +1,47 @@
-From 4939086c6c30d1093abd0bd3c9e1554616f17619 Mon Sep 17 00:00:00 2001
+From 64e493c2897981cfdd8c866bbe15f722378f6bfb Mon Sep 17 00:00:00 2001
 From: minhmc2007 <quangminh21072010@gmail.com>
 Date: Fri, 2 Oct 2026 21:01:02 +0700
 Subject: [PATCH] zlib-ng: drop AVX512 from the x86 build
 
-  system/lib64/libz.so: db90: push %rbp
-  dbb2: 62 f1 7c 48 11 85 90 vmovups %zmm0,-0x70(%rbp)
+  system/lib64/libz.so: dbb2: 62 f1 7c 48 11 85 90  vmovups %zmm0,-0x70(%rbp)
   Signal: 4 (ILL) si_code: ILL_ILLOPN
-
-apexd crashed while mounting APEX, in code reached from deflateCopy.
-x86-64 v1 has no AVX512, so the EVEX-encoded vmovups traps.
+  apexd crashed mounting APEX, in code reached from deflateCopy
 
 libz_defaults is a cc_defaults on libz, so -mavx512f and friends applied
-to every source in the module, not only the dispatched kernels. clang was
-free to autovectorise ordinary code such as deflate.c at -O3, which is
-where the fault came from. The runtime dispatch in functable.c was never
-the problem; it correctly gates every wide kernel on has_avx512_common.
+to every source in the module rather than only the dispatched kernels.
+At -O3 clang autovectorised ordinary code such as deflate.c, which is
+where the EVEX vmovups came from. The functable dispatch was never at
+fault and still gates every wide kernel on has_avx512_common.
 
-Drop -mavx512f -mavx512dq -mavx512bw -mavx512vl -mavx512vnni, the
-X86_AVX512 and X86_AVX512VNNI defines, and the four arch/x86 sources that
-compile to nothing without them. SSE2 through AVX2, PCLMULQDQ and
-VPCLMULQDQ all stay, so the x86-64 v1 SIMD path is unaffected.
+Removed the five -mavx512* flags, the X86_AVX512 and X86_AVX512VNNI
+defines, and the four arch/x86 sources that compile to nothing without
+them.
 
-VPCLMULQDQ is left on: it is not AVX512 and Alder Lake has it.
+The vpclmulqdq CRC kernel also goes, but it needed a source guard rather
+than a flag change. X86_VPCLMULQDQ_CRC stays in cflags_x86 so Android.bp
+is untouched, yet crc32_fold_vpclmulqdq_tpl.h is built entirely from
+_mm512_* zmm intrinsics and so cannot compile without avx512f. functable.c
+already required has_avx512_common before selecting it, so the kernel was
+unreachable without AVX512 anyway and nothing is lost by gating it on
+X86_AVX512 as well as X86_VPCLMULQDQ_CRC.
 
-Change-Id: Ie7007ad332b7f1eb081e645b49b0a8b13087b77e
+crc32_fold_pclmulqdq_tpl.h is unaffected: it only reaches the zmm template
+when X86_VPCLMULQDQ is set, which only crc32_vpclmulqdq.c does.
+
+x86-64 v1 keeps SSE2 through AVX2, PCLMULQDQ and VPCLMULQDQ, so the SIMD
+path is intact on any x86_64 CPU rather than only on ones with AVX512.
+
+Verified by compiling all 49 x86_64 libz sources with the module's exact
+flags under -Werror, and by disassembling the objects: no zmm and no mask
+register anywhere, deflate.c included.
+
+Change-Id: I8714a743b7b1c5fc912c949be8c40f02f4985fe4
 ---
- Android.bp | 20 --------------------
- 1 file changed, 20 deletions(-)
+ Android.bp                  | 20 --------------------
+ arch/x86/crc32_vpclmulqdq.c |  3 ++-
+ arch/x86/x86_functions.h    |  2 +-
+ functable.c                 |  2 +-
+ 4 files changed, 4 insertions(+), 23 deletions(-)
 
 diff --git a/Android.bp b/Android.bp
 index acc1aab..ecea040 100644
@@ -87,6 +102,46 @@ index acc1aab..ecea040 100644
              ],
          },
          linux_bionic: {
+diff --git a/arch/x86/crc32_vpclmulqdq.c b/arch/x86/crc32_vpclmulqdq.c
+index cad35b1..bea36fa 100644
+--- a/arch/x86/crc32_vpclmulqdq.c
++++ b/arch/x86/crc32_vpclmulqdq.c
+@@ -3,7 +3,8 @@
+  * For conditions of distribution and use, see copyright notice in zlib.h
+  */
+ 
+-#ifdef X86_VPCLMULQDQ_CRC
++/* The zmm folds in crc32_fold_vpclmulqdq_tpl.h need avx512f, so this kernel is unusable without X86_AVX512. */
++#if defined(X86_VPCLMULQDQ_CRC) && defined(X86_AVX512)
+ 
+ #define X86_VPCLMULQDQ
+ #define CRC32_FOLD_COPY  crc32_fold_vpclmulqdq_copy
+diff --git a/arch/x86/x86_functions.h b/arch/x86/x86_functions.h
+index 5d9065e..46e00a4 100644
+--- a/arch/x86/x86_functions.h
++++ b/arch/x86/x86_functions.h
+@@ -80,7 +80,7 @@ void     crc32_fold_pclmulqdq(crc32_fold *crc, const uint8_t *src, size_t len, u
+ uint32_t crc32_fold_pclmulqdq_final(crc32_fold *crc);
+ uint32_t crc32_pclmulqdq(uint32_t crc32, const uint8_t *buf, size_t len);
+ #endif
+-#ifdef X86_VPCLMULQDQ_CRC
++#if defined(X86_VPCLMULQDQ_CRC) && defined(X86_AVX512)
+ uint32_t crc32_fold_vpclmulqdq_reset(crc32_fold *crc);
+ void     crc32_fold_vpclmulqdq_copy(crc32_fold *crc, uint8_t *dst, const uint8_t *src, size_t len);
+ void     crc32_fold_vpclmulqdq(crc32_fold *crc, const uint8_t *src, size_t len, uint32_t init_crc);
+diff --git a/functable.c b/functable.c
+index 489399c..ec699c2 100644
+--- a/functable.c
++++ b/functable.c
+@@ -207,7 +207,7 @@ static int init_functable(void) {
+     }
+ #endif
+     // X86 - VPCLMULQDQ
+-#ifdef X86_VPCLMULQDQ_CRC
++#if defined(X86_VPCLMULQDQ_CRC) && defined(X86_AVX512)
+     if (cf.x86.has_pclmulqdq && cf.x86.has_avx512_common && cf.x86.has_vpclmulqdq) {
+         ft.crc32 = &crc32_vpclmulqdq;
+         ft.crc32_fold = &crc32_fold_vpclmulqdq;
 -- 
 2.55.0
 
