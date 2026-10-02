@@ -1,9 +1,22 @@
-From f45526c7f5066b543b58d9969a955233ea1f770d Mon Sep 17 00:00:00 2001
+From 1b1b725946f224de3714b37924eb1d41c99a99c4 Mon Sep 17 00:00:00 2001
 From: minhmc2007 <quangminh21072010@gmail.com>
 Date: Fri, 2 Oct 2026 05:35:12 +0700
 Subject: [PATCH] envsetup: do not enable ccache
 
-Change-Id: Ifd95160ac184144cae66f58f645efaca2519ae60
+  export USE_CCACHE=1
+
+setup_ccache exports USE_CCACHE=1 and points CCACHE_EXEC at ccache on
+every envsetup, so each build writes a cache whether or not one was
+wanted. It also sets CCACHE_MAXSIZE itself, but a cache left at its
+default is unbounded.
+
+Commenting out the call rather than the body leaves USE_CCACHE unset, so
+USE_CCACHE=1 in the environment still works for anyone who wants it, and
+re-enabling is deleting one character.
+
+205 patches, 0 conflicts.
+
+Change-Id: I130dbd6fd172dc872402342b379c6212db273df3
 ---
  envsetup.sh | 5 ++++-
  1 file changed, 4 insertions(+), 1 deletion(-)

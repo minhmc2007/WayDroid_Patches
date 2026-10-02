@@ -1,0 +1,97 @@
+From f9f3acb0e1d3ba8502e61c7d769894096aa477c1 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Fri, 2 Oct 2026 11:03:36 +0700
+Subject: [PATCH] tensorflow: give the tflite targets the neon_2_sse include
+ dir
+
+  external/tensorflow/tensorflow/lite/delegates/xnnpack/
+    quantization_util.cc:21: In file included from
+  external/tensorflow/.../optimized/optimized_ops.h:30: In file
+    included from
+  external/tensorflow/.../kernels/internal/common.h:29: In file
+    included from
+  external/tensorflow/.../optimized/neon_check.h:25:10: fatal error:
+    'NEON_2_SSE.h' file not found
+
+NEON_2_SSE.h is Intel's shim that re-implements the ARM NEON intrinsics
+using SSE, so the optimized kernels keep their fast path on x86.
+neon_check.h includes it whenever __SSE4_1__ is defined and
+TF_LITE_DISABLE_X86_NEON is not, which is every x86_64 compile of these
+sources. The file is present at external/neon_2_sse, so this is a missing
+include path, not a missing header.
+
+171 sources reach optimized_ops.h, so the fix goes on the targets that
+compile any of them:
+
+  libtflite_kernel_utils           had no include_dirs at all
+  libtflite_kernels               had none either
+  libtensorflowlite_xnnpack_jni   had XNNPACK's, without neon_2_sse
+
+libtflite_static also compiles neon_tensor_utils.cc, but it is defined
+in tensorflow/lite/tflite_static.bp, which Soong never parses: only files
+named Android.bp are auto-discovered, and none of the 22 entries under
+external/tensorflow in out/.module_paths/Android.bp.list is that file. It
+needs nothing.
+
+TF_LITE_DISABLE_X86_NEON, which tflite_defaults already sets, would also
+make this compile, but only by forcing the Portable kernels. Left the fast
+path alone.
+
+205 patches, 0 conflicts.
+
+Change-Id: I85527fccf69686665ffb16b9c6cbe7f78f5360b7
+---
+ tensorflow/lite/Android.bp         |  6 ++++++
+ tensorflow/lite/kernels/Android.bp | 12 ++++++++++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/tensorflow/lite/Android.bp b/tensorflow/lite/Android.bp
+index 6fb08b62..df14bd68 100644
+--- a/tensorflow/lite/Android.bp
++++ b/tensorflow/lite/Android.bp
+@@ -259,6 +259,12 @@ cc_library_shared {
+     include_dirs: [
+         "external/XNNPACK/include",
+         "external/XNNPACK/src",
++        // delegates/xnnpack/quantization_util.cc includes optimized_ops.h,
++        // which reaches kernels/internal/optimized/neon_check.h. That
++        // includes NEON_2_SSE.h whenever __SSE4_1__ is defined, so the
++        // x86_64 build needs it. Setting TF_LITE_DISABLE_X86_NEON instead
++        // would compile, but only by dropping to the Portable kernels.
++        "external/neon_2_sse",
+     ],
+     static_libs: [
+         "libruy_static",
+diff --git a/tensorflow/lite/kernels/Android.bp b/tensorflow/lite/kernels/Android.bp
+index 52377943..452edea4 100644
+--- a/tensorflow/lite/kernels/Android.bp
++++ b/tensorflow/lite/kernels/Android.bp
+@@ -47,6 +47,13 @@ cc_library_static {
+     static_libs: [
+         "libruy_static",
+     ],
++    // internal/optimized/neon_check.h includes NEON_2_SSE.h on x86, which
++    // re-implements the ARM intrinsics with SSE. This target had no
++    // include_dirs at all.
++    include_dirs: [
++        "external/gemmlowp",
++        "external/neon_2_sse",
++    ],
+     cflags: [
+         "-Wno-extern-c-compat",
+         "-Wno-sign-compare",
+@@ -183,6 +190,11 @@ cc_library_static {
+     static_libs: [
+         "libfft2d",
+     ],
++    // see the comment on libtflite_kernel_utils above
++    include_dirs: [
++        "external/gemmlowp",
++        "external/neon_2_sse",
++    ],
+     cflags: [
+         "-DNAMESPACE_FOR_HASH_FUNCTIONS=farmhash",
+     ],
+-- 
+2.55.0
+
