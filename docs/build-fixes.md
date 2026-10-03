@@ -26,7 +26,48 @@ The remaining three are configuration, not defect fixes:
 |---|---|---|
 | `device/waydroid/waydroid/0001` | set `AXION_MAINTAINER` and `AXION_PROCESSOR` | AxionOS exports them as About phone properties |
 | `packages/apps/FaceUnlock/0001` | drop four Megvii `required:` entries | the prebuilts carry `android_arm64` srcs only |
-| `build/make/0001` | stop calling `setup_ccache` | it exports `USE_CCACHE=1` on every build |
+| `build/make/0001` | stop calling `setup_ccache`, honour falsy `USE_CCACHE` | it exports `USE_CCACHE=1` on every build; `USE_CCACHE=0` enabled ccache |
+
+## Why the ccache entry touches two files
+
+`setup_ccache` in `envsetup.sh` exports `USE_CCACHE=1` and points `CCACHE_EXEC`
+at ccache on every build, and leaves `CCACHE_MAXSIZE` unbounded. Commenting out
+the call fixes that, but on its own it is not enough, because the gate in
+`core/ccache.mk` only matched one spelling of off:
+
+```make
+ifneq ($(filter-out false,$(USE_CCACHE)),)
+```
+
+`filter-out` returns its whole argument list minus the words it is given, so
+every other value survived, `0` and `no` and `off` included. `USE_CCACHE=0`
+enabled ccache. This matters because the two gates disagree: soong's
+`IsEnvTrue` rejects `0`, but `ccache.mk` is what sets `CC_WRAPPER` and the
+`CCACHE_*` variables soong then consumes, and it is the permissive one.
+
+The symptom did not look like a ccache problem at all:
+
+```
+ccache: error: Not a directory
+```
+
+Nothing created `~/.cache/ccache` once `setup_ccache` was disabled, and soong
+passes `-B ~/.cache/ccache` to nsjail. nsjail's `-B` creates a missing bind
+source as an empty regular file, so ccache was handed a file where it wanted a
+directory and every compile failed at the wrapper. The directory was recreated
+by hand to get the build moving; the patch makes the configuration correct
+instead of the symptom.
+
+Nothing is removed. Verified with real `make` against both expressions:
+
+| `USE_CCACHE` | before | after |
+| --- | --- | --- |
+| empty | off | off |
+| `0` | **on** | off |
+| `1` | on | on |
+| `false` | off | off |
+| `no`, `off` | **on** | off |
+| `yes`, `true`, `2` | on | on |
 
 ## Why hbm is disabled rather than fixed
 

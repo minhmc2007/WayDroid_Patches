@@ -1,24 +1,62 @@
-From 6b493c37c09a942b5bf8e34e92873aa44f5b97c3 Mon Sep 17 00:00:00 2001
+From 02a065c28fbb02341161b98993f2e1157c06ff12 Mon Sep 17 00:00:00 2001
 From: minhmc2007 <quangminh21072010@gmail.com>
 Date: Fri, 2 Oct 2026 05:35:12 +0700
 Subject: [PATCH] envsetup: do not enable ccache
 
-  export USE_CCACHE=1
+Two separate reasons, both of which had to be fixed.
 
-setup_ccache exports USE_CCACHE=1 and points CCACHE_EXEC at ccache on
-every envsetup, so each build writes a cache whether or not one was
-wanted. It also sets CCACHE_MAXSIZE itself, but a cache left at its
-default is unbounded.
-
+setup_ccache exports USE_CCACHE=1 and points CCACHE_EXEC at ccache on every
+envsetup, so each build wrote a cache whether or not one was wanted. It also
+sets CCACHE_MAXSIZE itself, but a cache left at its default is unbounded.
 Commenting out the call rather than the body leaves USE_CCACHE unset, so
-USE_CCACHE=1 in the environment still works, and re-enabling is deleting
-one character.
+USE_CCACHE=1 in the environment still works, and re-enabling is deleting one
+character.
 
-Change-Id: If718cc565f46aaebdda7184fe12422e36237cd49
+The gate in core/ccache.mk only matched the literal word false:
+
+  ifneq ($(filter-out false,$(USE_CCACHE)),)
+
+filter-out returns the whole list minus the words it is given, so any other
+value survived, including 0, no and off. USE_CCACHE=0 therefore enabled
+ccache. That matters because the two gates disagree: soong's IsEnvTrue
+rejects 0, but ccache.mk is what sets CC_WRAPPER and the CCACHE_* variables
+that soong then uses, and it is the permissive one.
+
+The visible symptom was not a ccache problem at all:
+
+  ccache: error: Not a directory
+
+Nothing created ~/.cache/ccache once setup_ccache was disabled, and soong
+passes -B ~/.cache/ccache to nsjail. nsjail's -B creates a missing bind
+source as an empty regular file, so ccache was handed a file where it
+wanted a directory and every compile failed at the wrapper. The dir was
+replaced by hand to get the build moving; this makes the configuration
+itself correct instead.
+
+Accepting the usual falsy spellings keeps ccache re-enablable: 1, yes, true
+and any other non-empty value still turn it on, so nothing is removed.
+
+Change-Id: Ia38263cc5e06f4c2449f44bf833fd7189c8c058f
 ---
- envsetup.sh | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ core/ccache.mk | 4 +++-
+ envsetup.sh    | 3 ++-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
+diff --git a/core/ccache.mk b/core/ccache.mk
+index d10aceb..eb8dcf3 100644
+--- a/core/ccache.mk
++++ b/core/ccache.mk
+@@ -29,7 +29,9 @@
+ # So if you still want to use ccache, continue setting USE_CCACHE, but also set
+ # the CCACHE_EXEC environment variable to the path to your ccache executable.
+ ifneq ($(CCACHE_EXEC),)
+-ifneq ($(filter-out false,$(USE_CCACHE)),)
++# filter-out matched only the literal word false, so USE_CCACHE=0 enabled ccache
++# instead of disabling it. Accept the usual falsy spellings as off.
++ifneq ($(filter-out false 0 no off,$(USE_CCACHE)),)
+   # The default check uses size and modification time, causing false misses
+   # since the mtime depends when the repo was checked out
+   CCACHE_COMPILERCHECK ?= content
 diff --git a/envsetup.sh b/envsetup.sh
 index db06cb6..2bdc2ec 100644
 --- a/envsetup.sh

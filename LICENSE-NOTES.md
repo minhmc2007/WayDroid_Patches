@@ -75,7 +75,8 @@ derived from any WayDroid commit:
 - `packages/apps/FaceUnlock/0001` drops four Megvii prebuilts from a `required:`
   list, since they carry `android_arm64` srcs only
 - `build/make/0001` comments out the `setup_ccache` call in `envsetup.sh`, which
-  otherwise exports `USE_CCACHE=1` on every build
+  otherwise exports `USE_CCACHE=1` on every build, and fixes the `core/ccache.mk`
+  gate so `USE_CCACHE=0` disables ccache instead of enabling it
 
 They are kept in a separate layer from the GPL material precisely so that
 Apache-2.0 does not appear to cover upstream's GPL-3.0 work.
