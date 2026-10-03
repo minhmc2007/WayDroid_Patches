@@ -3,7 +3,7 @@
 Ten patches, hand written, under Apache-2.0. They sit apart from the GPL-3.0 fork
 deltas on purpose, so Apache-2.0 never appears to cover upstream's work.
 
-Ten fix a defect in a project as its own upstream publishes it. The other three
+Eleven fix a defect in a project as its own upstream publishes it. The other three
 are local configuration and touch no upstream code. Every fix was made after a
 build failed, and every commit message quotes the error that prompted it.
 
@@ -27,6 +27,40 @@ The remaining three are configuration, not defect fixes:
 | `device/waydroid/waydroid/0001` | set `AXION_MAINTAINER` and `AXION_PROCESSOR` | AxionOS exports them as About phone properties |
 | `packages/apps/FaceUnlock/0001` | drop four Megvii `required:` entries | the prebuilts carry `android_arm64` srcs only |
 | `build/make/0001` | stop calling `setup_ccache`, honour falsy `USE_CCACHE` | it exports `USE_CCACHE=1` on every build; `USE_CCACHE=0` enabled ccache |
+| `build/make/0002` | drop the hard 6-job clamp in `envsetup.sh` | it overrode `perfConfigForRam` on any host with more than six cores |
+
+## Why the job cap had to go
+
+`perfConfigForRam` in `envsetup.sh` already derives a job count from RAM and
+returns `cpu_count` for anything under 32 GiB, and `setupPerf` returns early at
+32 GiB and above without setting anything at all. A separate clamp then forced
+the result down to 6:
+
+```bash
+if (( jobs > 6 )); then
+  jobs=6
+fi
+```
+
+So the RAM scaling decided 12 and the clamp overruled it. Verified against this
+host, where `hostRamGb` rounds 15.3 GiB up to 16 and therefore takes the
+`ram < 32` branch:
+
+| | value |
+| --- | --- |
+| `perfConfigForRam` | `jobs=12  GOMEMLIMIT=16GiB  java=8g` |
+| with the clamp | `NINJA_ARGS=-j6` |
+| without the clamp | `NINJA_ARGS=-j12` |
+
+The `cpu_count` clamp stays as a sanity bound, and so does `highmem_jobs`, which
+stays at 1 under 16 GiB. That one is not a job cap in the ordinary sense: it is
+`NINJA_HIGHMEM_NUM_JOBS`, the limit on concurrent high-memory edges such as LTO
+and dex2oat, and it is what actually keeps a low-RAM host out of swap. Raising
+the ordinary job count to 12 while leaving that at 1 gets the parallelism
+without giving up the protection.
+
+Note this is AxionOS's own heuristic, added in `54170ff` on the
+`AxionAOSP/android_build` remote, not something LineageOS maintains.
 
 ## Why the ccache entry touches two files
 

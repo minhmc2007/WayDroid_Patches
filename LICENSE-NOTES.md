@@ -6,7 +6,7 @@ do not bleed into each other.
 | layer | patches | provenance | licence |
 |---|---|---|---|
 | `10-lineage-forks` | 140 | generated from upstream WayDroid commits | GPL-3.0 |
-| `15-ours` | 13 | hand written here | Apache-2.0 |
+| `15-ours` | 14 | hand written here | Apache-2.0 |
 | `20-upstream` | 54 | upstream `base-patches-36` | GPL-3.0 |
 
 ## GPL-3.0
@@ -77,6 +77,9 @@ derived from any WayDroid commit:
 - `build/make/0001` comments out the `setup_ccache` call in `envsetup.sh`, which
   otherwise exports `USE_CCACHE=1` on every build, and fixes the `core/ccache.mk`
   gate so `USE_CCACHE=0` disables ccache instead of enabling it
+- `build/make/0002` removes the hard clamp to 6 build jobs, which overrode
+  `perfConfigForRam`'s RAM- and CPU-derived count on any host with more than six
+  cores
 
 They are kept in a separate layer from the GPL material precisely so that
 Apache-2.0 does not appear to cover upstream's GPL-3.0 work.
@@ -97,5 +100,5 @@ forks.
 
 ## Per-patch detail
 
-See `docs/build-fixes.md` for what each of the thirteen patches does and why, and
+See `docs/build-fixes.md` for what each of the fourteen patches does and why, and
 `TRACKING.md` for the fork deltas.

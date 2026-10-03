@@ -1,0 +1,44 @@
+From 71b30f84d7d75bf0329d22ec3bd5e8a2d8f236ef Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Sat, 3 Oct 2026 08:52:11 +0700
+Subject: [PATCH] envsetup: drop the hard 6-job cap
+
+perfConfigForRam already picks a job count from RAM, returning
+cpu_count for anything under 32GiB, and setupPerf already skips entirely
+at 32GiB and above. The extra clamp to 6 then overrode that on every
+machine with more than six cores, so a 12-core host got -j6.
+
+Verified against this host, where hostRamGb rounds 15.3GiB up to 16 and
+so takes the ram < 32 branch:
+
+  perfConfigForRam -> jobs=12  GOMEMLIMIT=16GiB  java=8g
+  with the cap      -> NINJA_ARGS=-j6
+  without the cap   -> NINJA_ARGS=-j12
+
+The cpu_count clamp stays as a sanity bound, and highmem_jobs stays at 1
+under 16GiB, which is the limit on concurrent LTO and dex2oat work and is
+what actually keeps a low-RAM host from swapping.
+
+Change-Id: I5e88e5aee5cdf631e33fc855654b0118ffaeddf7
+---
+ envsetup.sh | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/envsetup.sh b/envsetup.sh
+index 2bdc2ec..10921fc 100644
+--- a/envsetup.sh
++++ b/envsetup.sh
+@@ -3164,9 +3164,7 @@ function setupPerf() {
+     cpu_count="$(cpuCount)"
+     read -r jobs go_mem_limit java_xmx <<< "$(perfConfigForRam "$ram_gb" "$cpu_count")"
+ 
+-    if (( jobs > 6 )); then
+-        jobs=6
+-    fi
++    # No hard job cap: perfConfigForRam already scales by RAM and cpu_count.
+     if (( jobs > cpu_count )); then
+         jobs="$cpu_count"
+     fi
+-- 
+2.55.0
+
