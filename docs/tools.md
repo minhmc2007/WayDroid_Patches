@@ -1,6 +1,6 @@
 # Tools
 
-Four scripts. All are read-only with respect to your LineageOS tree except
+Four scripts. All are read-only with respect to your AxionOS tree except
 `gen-fork-patches.sh`, which writes into the patch repo.
 
 ## `waydroid-patches.sh`
@@ -42,7 +42,9 @@ Diffing from the **merge-base**, not the LineageOS tip, is what keeps
 LineageOS commits out of the series. That is also what handles a diverged fork:
 `lineage-sdk` is 2 LineageOS commits behind its fork, and diffing from the
 merge-base yields the 12 Waydroid commits while those 2 stay untouched in the
-checkout.
+checkout. The upstream being diffed against is LineageOS, not AxionOS: the forks
+are Waydroid branches off LineageOS, and the AxionOS side of the merge-base is
+whatever the checkout carries.
 
 If the merge-base falls outside `GEN_FETCH_DEPTH` (default 120), it says so and
 skips rather than producing a wrong series.

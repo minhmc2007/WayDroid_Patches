@@ -1,11 +1,12 @@
-# WayDroid ATV on LineageOS 23.2, as patches not forks
+# WayDroid ATV on AxionOS 2.8, as patches not forks
 
-Branch `lineage-23.2`. Phone build, not Android TV.
+ROM is AxionOS 2.8, its own tree derived from LineageOS 23.2 on Android 16. Base
+branch is `lineage-23.2`. Phone build, not Android TV.
 
 Upstream [WayDroid-ATV](https://github.com/WayDroid-ATV) `remove-project`s ~15
 LineageOS projects and re-adds its own forks at the same paths, so every later
-LineageOS merge is a manual fork rebase. This repo keeps the LineageOS
-checkout and layers patches on top instead. Nothing LineageOS maintains is ever
+LineageOS merge is a manual fork rebase. This repo keeps the AxionOS checkout
+and layers patches on top instead. Nothing LineageOS or AxionOS maintains is ever
 removed or re-pointed.
 
 ## Host prerequisites
@@ -47,11 +48,11 @@ rustup target list --installed | grep -q android && echo "rust ok" || echo "rust
 ## Usage
 
 ```shell
-./waydroid-patches.sh manifest /path/to/LineageOS   # add fragments, sync
-./waydroid-patches.sh apply    /path/to/LineageOS   # layer the patches
-./waydroid-patches.sh status   /path/to/LineageOS
-./waydroid-patches.sh revert   /path/to/LineageOS   # plan only
-./waydroid-patches.sh revert   /path/to/LineageOS --yes
+./waydroid-patches.sh manifest /path/to/AxionOS   # add fragments, sync
+./waydroid-patches.sh apply    /path/to/AxionOS   # layer the patches
+./waydroid-patches.sh status   /path/to/AxionOS
+./waydroid-patches.sh revert   /path/to/AxionOS   # plan only
+./waydroid-patches.sh revert   /path/to/AxionOS --yes
 ```
 
 `apply` is idempotent and syncs by itself, so re-run it after any `repo sync`.
@@ -86,7 +87,7 @@ LineageOS and has nothing we lack, and a phone build does not use it.
 ## Deviations from upstream
 
 Eight upstream patches are not byte-identical here, because upstream's context
-is the forks and this tree is LineageOS. Each was resolved by hand and re-emitted
+is the forks and this tree is AxionOS. Each was resolved by hand and re-emitted
 with `git format-patch`, keeping its author date and subject so `already_applied`
 still recognises it. They stay in their GPL-3.0 layer rather than moving to
 `15-ours`: a patch derived from an upstream commit inherits that commit's
@@ -122,8 +123,8 @@ while x86_64 targets use `ANDROID_USE_GAPPS=true` and Waydroid's. An x86_64
 build must not set `WITH_GMS`:
 
 ```shell
-axion waydroid_x86_64 userdebug va     # x86_64, uses Waydroid GApps
-axion waydroid_arm64 userdebug gms     # arm, uses AxionOS GApps
+axion waydroid_x86_64 va     # x86_64, uses Waydroid GApps
+axion waydroid_arm64 gms     # arm, uses AxionOS GApps
 ```
 
 `gms` on x86_64 is the failing case and cannot be made to work: AxionOS's APKs
@@ -161,16 +162,18 @@ tools/gen-fork-patches.sh <los-root> "$PWD/base-patches-36/10-lineage-forks" fra
 
 ## Building
 
-Not driven by this repo. In an envsetup'd shell:
+Not driven by this repo. In a shell, in the source root:
 
 ```shell
-axion waydroid_x86_64 userdebug va
-mka systemimage
-mka vendorimage
+. build/envsetup.sh
+axion waydroid_x86_64 va
+mka systemimage vendorimage
 ```
 
-`axion` is AxionOS's build wrapper. It takes the build type and the GApps
-variant as arguments, so the `lunch` release suffix has no equivalent here.
+`axion` is AxionOS's build wrapper and replaces `lunch`. It takes the build type
+and the GApps variant as arguments, so the `lunch` release suffix has no
+equivalent here; the build type defaults to `userdebug`. `mka` is `mka` from
+`build/make`, not the AOSP `m`/`mm`.
 
 Two environment gotchas:
 
@@ -193,3 +196,7 @@ and not the library LLVM 20 was built against.
 branch `lineage-23.2` and are GPL-3.0. `15-ours/`, `waydroid-patches.sh` and
 `tools/` are ours under Apache-2.0 (`LICENSE-APACHE-2.0`). The layers are split
 so the two licences never overlap. See `LICENSE-NOTES.md`.
+
+The base is [AxionAOSP/android](https://github.com/AxionAOSP/android) at
+`lineage-23.2`, which is LineageOS 23.2 on Android 16 with AxionOS's own forks
+over 115 projects, plus `AxionAOSP-devices` and `AxionAOSP` on GitLab.

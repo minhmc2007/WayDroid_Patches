@@ -3,7 +3,7 @@
 Fifteen patches, hand written, under Apache-2.0. They sit apart from the GPL-3.0
 fork deltas on purpose, so Apache-2.0 never appears to cover upstream's work.
 
-Twelve fix a defect in a project as its own upstream publishes it. The other three
+Eleven fix a defect in a project as its own upstream publishes it. The other four
 are local configuration and touch no upstream code. Every fix was made after a
 build failed, and every commit message quotes the error that prompted it.
 
@@ -21,7 +21,7 @@ build failed, and every commit message quotes the error that prompted it.
 | `external/zlib-ng/0001` | drop AVX512 and AVX2 from the x86 build | apexd SIGILL in `deflateCopy`, then SIGSEGV in `chunkmemset_avx2` |
 | `external/zlib-ng/0002` | define `HAVE_ATTRIBUTE_ALIGNED` | 32-bit zygote SIGSEGV in `chunkmemset_safe_ssse3` and `inflate_fast_ssse3`; fixed and confirmed |
 
-The remaining three are configuration, not defect fixes:
+The remaining four are configuration, not defect fixes:
 
 | patch | change | why |
 |---|---|---|
@@ -112,7 +112,7 @@ branch targets ash 0.38 or later. `external/rust/hbm/hbm/src/sash.rs` uses the
 `ash::khr` and `ash::ext` submodules along with the struct builder methods
 `.push_next()`, `.src_offset()` and `.application_name()`.
 
-LineageOS 23.2 ships ash 0.37.3, which offers `pub mod extensions` and no
+AxionOS 2.8 ships ash 0.37.3, which offers `pub mod extensions` and no
 builders at all. Substituting the WayDroid-ATV fork of
 `external/rust/android-crates-io` changes nothing, since that fork is also
 0.37.3. The result is 68 errors.
@@ -144,9 +144,10 @@ and this symlink has none, so it is neither verified nor clobbered.
 ## The drm-ffi entry is an AOSP inconsistency
 
 `external/rust/android-crates-io` is a LineageOS project this repo does not
-otherwise modify. Inside AOSP's own snapshot `crates/drm-ffi` sits at version
-0.9.0 while its `Cargo.toml` pins `drm-sys` 0.8.0, and the `drm-sys` actually
-used declares a `point` field the 0.9.0 initializers never set:
+otherwise modify, so AxionOS inherits it unchanged. Inside AOSP's own snapshot
+`crates/drm-ffi` sits at version 0.9.0 while its `Cargo.toml` pins `drm-sys` 0.8.0,
+and the `drm-sys` actually used declares a `point` field the 0.9.0 initializers
+never set:
 
 ```
 error[E0063]: missing field `point` in initializer of `drm_sys::drm_syncobj_handle`

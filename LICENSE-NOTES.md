@@ -6,7 +6,7 @@ do not bleed into each other.
 | layer | patches | provenance | licence |
 |---|---|---|---|
 | `10-lineage-forks` | 140 | generated from upstream WayDroid commits | GPL-3.0 |
-| `15-ours` | 14 | hand written here | Apache-2.0 |
+| `15-ours` | 15 | hand written here | Apache-2.0 |
 | `20-upstream` | 54 | upstream `base-patches-36` | GPL-3.0 |
 
 ## GPL-3.0
@@ -23,9 +23,9 @@ is that project's upstream commit and inherits its licence.
 
 Eight of these 194 patches (6 in `10-lineage-forks`, 2 in `20-upstream`) are
 re-emitted with `git format-patch` after being resolved by hand against
-LineageOS rather than against the forks; README.md lists them. A ninth,
+AxionOS rather than against the forks; README.md lists them. A ninth,
 `20-upstream/device/waydroid/waydroid/0001`, is written here from scratch
-against a WayDroid-ATV project file, so it is GPL-3.0 for the same reason and
+against a Waydroid-ATV project file, so it is GPL-3.0 for the same reason and
 sits in a GPL-3.0 layer rather than in `15-ours/`. Author date and subject of
 the eight are unchanged. All nine stay GPL-3.0: they are modifications of
 GPL-3.0 upstream commits or files, so they belong in a GPL-3.0 layer and must
@@ -39,11 +39,11 @@ projects each carry their own licence.
 
 ## Apache-2.0
 
-`15-ours/` holds the thirteen patches written for this repo, plus
+`15-ours/` holds the fifteen patches written for this repo, plus
 `waydroid-patches.sh` and everything in `tools/`. Full text in
 `LICENSE-APACHE-2.0`.
 
-These are not derived from any WayDroid commit. Ten fix a defect in a
+These are not derived from any WayDroid commit. Eleven fix a defect in a
 project as published by its own upstream, discovered by building:
 
 - `external/rust/hbm/0001` renames a crate dependency that no 23.2 tree defines
@@ -65,8 +65,14 @@ project as published by its own upstream, discovered by building:
   `-mvpclmulqdq` which silently implies `__AVX__`, since x86-64 v1 needs none of
   them and apexd was dying in `deflateCopy` with SIGILL, then in
   `chunkmemset_avx2` with SIGSEGV
+- `external/zlib-ng/0002` defines `HAVE_ATTRIBUTE_ALIGNED`, which only `configure`
+  and `CMakeLists.txt` set, so the `Android.bp` build compiled with `ALIGNED_(x)`
+  expanding to nothing and every `ALIGNED_` table under-aligned while the SIMD
+  code kept reading it with `_mm_load_si128`. The 32-bit zygote was respawning
+  every twelve seconds with `#GP` in `chunkmemset_safe_ssse3` and
+  `inflate_fast_ssse3`
 
-The remaining three are not defect fixes but local configuration, also not
+The remaining four are not defect fixes but local configuration, also not
 derived from any WayDroid commit:
 
 - `device/waydroid/waydroid/0001` sets `AXION_MAINTAINER` and
@@ -84,7 +90,7 @@ derived from any WayDroid commit:
 They are kept in a separate layer from the GPL material precisely so that
 Apache-2.0 does not appear to cover upstream's GPL-3.0 work.
 
-Two of these ten patch a project our own manifest adds from WayDroid, so they
+Two of these fifteen patch a project our own manifest adds from WayDroid, so they
 are derivative works and inherit GPL-3.0 no matter who wrote the hunk. That is
 fine to place in this layer, since Apache-2.0 is one-way compatible with
 GPL-3.0: the combined work can be distributed under GPL-3.0.
@@ -100,5 +106,5 @@ forks.
 
 ## Per-patch detail
 
-See `docs/build-fixes.md` for what each of the fourteen patches does and why, and
+See `docs/build-fixes.md` for what each of the fifteen patches does and why, and
 `TRACKING.md` for the fork deltas.

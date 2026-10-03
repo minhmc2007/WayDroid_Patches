@@ -2,9 +2,11 @@
 
 ## Repo
 
-Waydroid and Waydroid-ATV changes as `.patch` files, layered on a stock LineageOS checkout. Meant to apply on almost any LineageOS-based ROM. No forks. Nothing LineageOS maintains gets removed or re-pointed.
+Waydroid and Waydroid-ATV changes as `.patch` files, layered on a stock AxionOS checkout. Meant to apply on almost any LineageOS-based ROM. No forks. Nothing LineageOS or AxionOS maintains gets removed or re-pointed.
 
-Default branch `lineage-23.2`. Phone build, not Android TV.
+ROM is AxionOS 2.8, which is LineageOS 23.2 on Android 16 with AxionOS's own forks. Base branch `lineage-23.2`. Phone build, not Android TV.
+
+Build with `. build/envsetup.sh`, then `axion <device> va` and `mka systemimage vendorimage`. `axion` replaces `lunch`.
 
 Read `README.md`, `docs/tools.md`, `docs/build-fixes.md` before touching anything.
 
