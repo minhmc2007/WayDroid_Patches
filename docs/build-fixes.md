@@ -1,9 +1,9 @@
 # Build fixes in `15-ours`
 
-Ten patches, hand written, under Apache-2.0. They sit apart from the GPL-3.0 fork
-deltas on purpose, so Apache-2.0 never appears to cover upstream's work.
+Fifteen patches, hand written, under Apache-2.0. They sit apart from the GPL-3.0
+fork deltas on purpose, so Apache-2.0 never appears to cover upstream's work.
 
-Eleven fix a defect in a project as its own upstream publishes it. The other three
+Twelve fix a defect in a project as its own upstream publishes it. The other three
 are local configuration and touch no upstream code. Every fix was made after a
 build failed, and every commit message quotes the error that prompted it.
 
@@ -19,6 +19,7 @@ build failed, and every commit message quotes the error that prompted it.
 | `hardware/interfaces/0001` | annotate `loadHardcodedEffects` | the constructor calls it without `mMutex` held |
 | `hardware/interfaces/0002` | implement `setNodeCeiling`, `clearNodeCeiling` | IPower V6 made both pure virtual |
 | `external/zlib-ng/0001` | drop AVX512 and AVX2 from the x86 build | apexd SIGILL in `deflateCopy`, then SIGSEGV in `chunkmemset_avx2` |
+| `external/zlib-ng/0002` | define `HAVE_ATTRIBUTE_ALIGNED` | 32-bit zygote SIGSEGV in `chunkmemset_safe_ssse3` and `inflate_fast_ssse3`; fixed and confirmed |
 
 The remaining three are configuration, not defect fixes:
 
@@ -246,6 +247,105 @@ on any x86_64 CPU.
 Verified by compiling all 41 x86_64 libz sources with the module's exact flags
 under `-Werror`, then disassembling every object: 0 `ymm`, 0 `zmm`, 0 mask
 registers and 0 `vmovdqa` across the whole module.
+
+## The second zlib-ng entry is a missing define, not a missing flag
+
+`zbuild.h` guards two macros on feature defines that no build system in this tree
+ever sets:
+
+```c
+#if defined(HAVE_ATTRIBUTE_ALIGNED)
+#  define ALIGNED_(x) __attribute__ ((aligned(x)))
+#else
+#  define ALIGNED_(x)
+#endif
+
+#ifdef HAVE_BUILTIN_ASSUME_ALIGNED
+#  define HINT_ALIGNED(p,n) __builtin_assume_aligned((void *)(p),(n))
+#else
+#  define HINT_ALIGNED(p,n) (p)
+#endif
+```
+
+`HAVE_ATTRIBUTE_ALIGNED` and `HAVE_BUILTIN_ASSUME_ALIGNED` are defined in exactly
+two places, `configure:1091` and `CMakeLists.txt:587`. AxionOS builds zlib-ng
+through `Android.bp`, so neither was ever set and both macros expanded to nothing.
+`ALIGNED_(x)` then drops the alignment from every object in the tree while the SIMD
+code keeps doing aligned accesses on it, which is the worse half of the pairing:
+the access is the one that assumes, the attribute is the one that got thrown away.
+
+Measured against the tree's own headers:
+
+| | before | after | asked for |
+|---|---|---|---|
+| `_Alignof(inflate_state)` | 8 | 64 | 64 (`inflate.h:99`) |
+| `_Alignof(permute_table)` | 1 | 32 | 32 (`arch/generic/chunk_permute_table.h:11`) |
+
+`_Alignof` reports 1 because `ALIGNED_(32)` was literally absent. In the shipped
+32-bit `libz.so` before the patch the table landed at `0x4fc4`, 4-byte aligned,
+and `pshufb_shf_table` at `0x5318`, 8-byte aligned against the 16 that
+`arch/x86/crc32_pclmulqdq_tpl.h` asks for. Both are read with `_mm_load_si128`,
+which is an aligned access by definition regardless of what the attribute said, so
+this was undefined behaviour in every arch and every variant, not only on x86.
+
+After the patch, from the unstripped intermediates of the build that fixed it:
+
+| | 32-bit `libz.so` | 64-bit `libz.so` |
+|---|---|---|
+| `permute_table` | `0x4fe0` | `0x60a0` |
+| `pshufb_shf_table` | `0x5340` | — |
+
+All three are 0 mod 32, so the attribute is being honoured now.
+
+The symptom was the 32-bit zygote, respawning about every twelve seconds and never
+reaching `ZygoteInit.preload` past `Class.forName`, while the 64-bit zygote came up
+normally. It died in inflate reading `core-icu4j.jar` from the `com.android.i18n`
+apex, at two separate offsets, both of them the `pshufb` in `GET_CHUNK_MAG` that
+folds the `_mm_load_si128` of `permute_table`:
+
+```
+#00 pc 00023299  /system/lib/libz.so (chunkmemset_safe_ssse3+393)
+#01 pc 000165bd  /system/lib/libz.so (inflate+8717)
+```
+
+A second coredump from the same boot, `dex2oat32` on `EasterEgg.apk`, is the other
+one of the pair: `libz.so+0x23ed8`, `inflate_fast_ssse3+0x9a8`. Both crashes report
+`si_code SI_KERNEL` with `err 00000000`, so `#GP` and not a page fault, which is
+what a misaligned `movaps`/`movdqa` raises on 32-bit x86 and what a bad address
+would not.
+
+Neither `pshufb` faults on a bad address, which is the part worth being careful
+about. In the `chunkmemset_safe_ssse3` tombstone `edi` was `base+0x28138`, the
+pc-thunk constant, so `permute_table` resolved to `base+0x4fc4` and the `pshufb`
+operand to `base+0x5084`, inside the module's own `.rodata`, mapped and readable.
+`ecx=192` and `edx=5` are `perm_idx_lut[8]`, a valid dist-11 entry, and `eax=16`
+is `sizeof(chunk_t)`. The instruction had nothing to fault on, and that is the
+part the rebuild settled rather than the tombstone.
+
+`dex2oat64` and the 64-bit zygote were unaffected, and the 64-bit `permute_table`
+was under-aligned in exactly the same way before the patch, at `0x6090`. So the
+alignment gap was present in the 64-bit module too; 64-bit never took the faulting
+path, because x86-64 tolerates the unaligned form where 32-bit does not.
+
+## The zygote fix is confirmed on the ROM, not inferred
+
+Worth stating plainly, because it was not the prediction. The rebuilt `libz.so`
+still contains the identical `pshufb`, at all six sites, only with the table
+aligned:
+
+```
+232b9: pshufb -0x23178(%edi,%ecx), %xmm0     # was -0x23174, table 4 mod 32
+23ef8: pshufb -0x23178(%ebx,%eax), %xmm0
+```
+
+Same instruction, same operands, same address arithmetic, and it no longer
+faults, so the cause was the alignment of `permute_table` and not the instruction.
+
+After rebuilding, `system/lib/libz.so` is `e22fa10e`, was `ae5f6bda`, and the
+32-bit zygote completed `preload`. `coredumpctl list` shows 43 `app_process32`
+entries, all of them from the boot before the rebuild, the newest at 15:32:43, and
+none since a boot at 21:12. `dex2oat32` did not recur either. Still 0 `ymm` and
+0 `zmm` in the rebuilt 32-bit module.
 
 ## Regenerating
 

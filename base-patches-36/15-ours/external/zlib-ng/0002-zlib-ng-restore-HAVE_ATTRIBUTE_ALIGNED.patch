@@ -1,0 +1,49 @@
+From cf87aa3fa015ad5514b7af935a5edf090ed2cc81 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Sat, 3 Oct 2026 16:13:31 +0700
+Subject: [PATCH] zlib-ng: restore HAVE_ATTRIBUTE_ALIGNED
+
+Both defines are only set by configure and CMakeLists.txt, so the
+Android.bp build left ALIGNED_(x) expanding to nothing in zbuild.h and
+HINT_ALIGNED(p,n) to p. Every ALIGNED_ object in the tree lost its
+alignment while the SIMD code kept doing aligned accesses on it:
+
+  _Alignof(inflate_state)   8, asked for 64   inflate.h:99
+  _Alignof(permute_table)   1, asked for 32   chunk_permute_table.h:11
+
+pshufb_shf_table, crc_k, crc_mask and crc_mask2 in
+arch/x86/crc32_pclmulqdq_tpl.h are read with _mm_load_si128, and
+chunk_permute_table.h with _mm_load_si128 from chunkset_ssse3.c, so the
+access is aligned by definition whatever the attribute said.
+
+The 32-bit zygote respawned every ~12 s and never got past
+ZygoteInit.preloadClass, dying in inflate reading core-icu4j.jar from the
+com.android.i18n apex. Two sites, both the pshufb in GET_CHUNK_MAG that
+folds the load of permute_table: chunkmemset_safe_ssse3+0x189 and
+inflate_fast_ssse3+0x9a8, the latter also hit by dex2oat32 on
+EasterEgg.apk. si_code SI_KERNEL with err 0, so #GP and not a page fault.
+
+Fixed and verified on the ROM. system/lib/libz.so is now e22fa10e, was
+ae5f6bda, permute_table is 0 mod 32 on both arches, and the six pshufb
+sites are unchanged apart from the table displacement. No app_process32
+coredump since the rebuild and dex2oat32 did not recur. Still 0 ymm and
+0 zmm.
+
+Change-Id: I142bfc7398b64ed1a198d62aa32bab2
+---
+ Android.bp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Android.bp b/Android.bp
+index 2abf193..ad5496e 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -29,6 +29,8 @@ cflags_shared = [
+     "-DWITH_CRC32_CHORBA",
+     "-DWITH_ALL_FALLBACKS",
+     "-DUNALIGNED_OK",
++    "-DHAVE_ATTRIBUTE_ALIGNED",
++    "-DHAVE_BUILTIN_ASSUME_ALIGNED",
+     "-O3",
+     "-DNDEBUG",
+     "-fno-semantic-interposition",
