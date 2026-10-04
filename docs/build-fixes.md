@@ -12,10 +12,13 @@ actual error.
 |---|---|---|
 | `vendor/gapps/0001` | drop `apps` on `prebuilt_apex` | Android 15's Soong has no such property |
 | `external/libsndfile/0001` | `libsndfile_linux` → `libsndfile12` | upstream's own pulseaudio depends on `libsndfile12` |
+| `external/mesa/0001` | define `mesa_gfxstream_aemu` | the fork's A15+ stub declares only the headers module |
+| `external/mesa/0002` | `ld.lld` by absolute path | the meson rule's PATH has no AOSP clang directory |
+| `external/mesa/0003` | `LIBVA_DIR` → `hardware/intel/common/libva` | the swap removes `external/libva`, so the version scrape is empty |
 
-Both are inconsistencies in upstream's `manifests-35` rather than defects we
-introduced. On Android 16 neither showed up, which is why upstream never fixed
-them.
+All five are inconsistencies in upstream's `manifests-35` rather than defects we
+introduced. On Android 16 none of them showed up, which is why upstream never
+fixed them.
 
 ## The gapps one
 
@@ -87,6 +90,52 @@ and all fourteen `lineage-18.1-mesa-*` branches were checked; none has
 which also matches the rule that a LineageOS-maintained project is never
 re-pointed. The Android 16 manifest swaps it because Android 16's gfxstream does
 not need `mesa_gfxstream_aemu` and Android 15's does.
+
+## The three mesa ones
+
+`0002` is ported from `base-patches-36/15-ours/external/mesa3d` on
+`lineage-23.2`, regenerated against `external/mesa` so the blob hashes match
+this tree. The meson rule runs with
+`PATH=~/.cargo/bin:/usr/bin:/usr/local/bin:$PATH`, which has no AOSP clang
+directory, and `prebuilts/build-tools` only puts the `mesa_clc` family on PATH.
+The path is derived from `$(TARGET_AR)`, which `mesa3d_cross.mk` already
+references for `ar`.
+
+`0003` is the one that reads as a mystery. `android/Android.mk:136` hardcoded
+
+```
+LIBVA_DIR := external/libva
+LIBVA_VERSION_MAJOR := $(shell sed -n -e 's/va_api_major_version *= *//p' $(LIBVA_DIR)/meson.build)
+```
+
+and `external/libva` is exactly what our own swap removes, in favour of
+`hardware/intel/common/libva`. `sed` matched nothing, both variables came out
+empty, and the generated `libva.pc` got `Version: .`, which meson rejected:
+
+```
+meson.build:782:9: ERROR: Dependency lookup for libva with method 'pkg-config'
+failed: Invalid version, need 'libva' ['>= 1.8.0'] found '.'.
+```
+
+Intel's libva declares the same two variables, so only the path changed. Its
+`Android.bp` already defines `libva` and `libva_headers`, which is what the
+`LOCAL_SHARED_LIBRARIES` and `LOCAL_HEADER_LIBRARIES` lines below ask for.
+
+Upstream hits the same failure on its own: `01-removes.xml` drops
+`platform/external/libva`, `02-waydroid.xml` adds
+`hardware/intel/common/libva`, and nothing updates `LIBVA_DIR`.
+
+Do not try to satisfy this with a host `libva`. `mesa3d_cross.mk:274` pins
+`PKG_CONFIG_LIBDIR` to the directory it generates, so pkg-config cannot see host
+libraries.
+
+`0001` exists because the fork's root `Android.bp` is a stub, commented
+*"Stub for satisfying dependency checks on A15+"*. It declares
+`mesa_gfxstream_aemu_headers` but not the library, and Android 15's
+`hardware/google/gfxstream/guest/magma` needs both. `src/gfxstream/aemu` is
+present and untouched, so the module is defined against sources already in the
+tree. The stub headers module also exported no include dir, so consumers
+including `Stream.h` had no include path either.
 
 ## Regenerating
 

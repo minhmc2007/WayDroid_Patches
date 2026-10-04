@@ -14,30 +14,46 @@ removed or re-pointed.
 sudo pacman -S --needed \
     bc bison flex gperf g++-multilib gcc-multilib git-lfs gnupg imagemagick \
     lzop pngcrush rsync schedtool squashfs-tools xsltproc zip \
-    python-setuptools python-mako python-yaml cbindgen clang lib32-glibc \
-    openjdk-17-jdk
+    python-setuptools python-mako python-yaml cbindgen rust-bindgen clang \
+    lib32-glibc openjdk-17-jdk
 rustup target add x86_64-linux-android i686-linux-android
 ```
 
-`python-mako`, `cbindgen`, `clang` and `lib32-glibc` are the four that bite.
-Each fails mesa late, naming a program or a library rather than anything to do
-with Waydroid:
+`python-mako`, `cbindgen`, `rust-bindgen`, `clang` and `lib32-glibc` are the
+five that bite. Each fails mesa late, naming a program or a library rather than
+anything to do with Waydroid:
 
 | missing | error |
 |---|---|
 | `python-mako` | `ERROR: ... Python (3.x) mako module >= 0.8.0 required to build mesa.` |
 | `cbindgen` | `src/nouveau/nil/meson.build:3:16: ERROR: Program 'cbindgen' not found or not executable` |
+| `rust-bindgen` | `meson.build:884:4: ERROR: Problem encountered: Mesa requires bindgen 0.71.1 or newer` |
 | `clang` | `bindgen/lib.rs:616: Unable to find libclang: couldn't find any valid shared libraries matching: ['libclang.so', ...]` |
 | `lib32-glibc` | `/usr/include/gnu/stubs.h:7:11: fatal error: 'gnu/stubs-32.h' file not found` |
 
 The `clang` one reads like a source bug, because the panic is raised inside a
 vendored crate. It is only a runtime dep of the `cbindgen` binary.
 
+`cbindgen` and `rust-bindgen` are different tools and mesa needs both:
+`cbindgen` generates C bindings *from* Rust, which nouveau's `nil` driver wants,
+while the Vulkan path wants `rust-bindgen`. Take the distro packages rather than
+`cargo install bindgen-cli`, which compiles from source for minutes when the
+distro already ships a version past the floor. Arch has 0.73.2.
+
+`rust-bindgen` is needed only because our manifest adds
+`external/llvm-project`. With LLVM present mesa takes its Rust path; drop that
+project and the requirement goes away, but so do `llvmpipe` and `iris`, which
+`BOARD_MESA3D_GALLIUM_DRIVERS` asks for.
+
+Do not install a host `libva`. `mesa3d_cross.mk` pins `PKG_CONFIG_LIBDIR` to the
+directory it generates, so pkg-config cannot see host libraries, which is the
+point. The libva problem that does need fixing is in `docs/build-fixes.md`.
+
 Check everything at once instead of one per build:
 
 ```shell
 for f in /usr/include/gnu/stubs-32.h /usr/lib32/libc.so /usr/bin/cbindgen \
-         /usr/lib/libxml2.so.16; do
+         /usr/bin/bindgen /usr/lib/libxml2.so.16; do
   printf '%-40s %s\n' "$f" "$([ -e "$f" ] && echo ok || echo MISSING)"
 done
 python3 -c "import mako" && echo "mako ok" || echo "mako MISSING"
@@ -154,10 +170,10 @@ Not driven by this repo. In an envsetup'd shell:
 
 ```shell
 lunch lineage_waydroid_x86_64-bp1a-userdebug
-m -j12 systemimage vendorimage
+m -j8 systemimage vendorimage
 ```
 
-Two environment gotchas:
+Environment gotchas:
 
 * `repo` caches JSON beside whatever gitconfig it reads. If `~/.gitconfig` is
   newer than `~/.repo_.gitconfig.json`, the `build-manifest.xml` rule tries to
@@ -165,7 +181,32 @@ Two environment gotchas:
   `Read-only file system`. Fix: run `repo manifest -o /dev/null` once **outside**
   a build.
 * 15 GB of RAM is under what kati wants; it was `SIGKILL`ed at "finishing Make
-  module rules". A big swap file helps but does not remove the need for RAM.
+  module rules", and at `-j12` the box has crashed outright twice. A big swap
+  file helps but does not remove the need for RAM, and `-j8` is the ceiling that
+  has held.
+* The mesa build fetches its Rust crates from `static.crates.io` at configure
+  time, through ~39 meson wraps. If DNS fails inside the build you get
+  `Temporary failure in name resolution`, five retries with delays, then
+  `ERROR: Subproject syn-2-rs is buildable: NO`. Populate the cache once while
+  the network is up and the build never needs it again:
+
+  ```shell
+  cd <los-root>/external/mesa/subprojects && mkdir -p packagecache
+  for w in *.wrap; do
+    url=$(sed -n 's/^source_url *= *//p' "$w")
+    fn=$(sed -n 's/^source_filename *= *//p' "$w")
+    hash=$(sed -n 's/^source_hash *= *//p' "$w")
+    [ -n "$url" ] || continue
+    [ -f "packagecache/$fn" ] && echo "$hash  packagecache/$fn" | sha256sum -c --status && continue
+    curl -sSL -o "packagecache/$fn" "$url" && echo "$hash  packagecache/$fn" | sha256sum -c
+  done
+  ```
+
+  `subprojects/.gitignore` already excludes `packagecache`, so the tree stays
+  clean and this is not a patch.
+* If the build dies partway with truncated archives or missing `android.jar`,
+  `out/` was corrupted by whatever killed it. `rm -rf out` and rebuild; narrow
+  deletes leave the bad artifacts in place.
 
 `docs/tools.md` covers the tooling. `docs/build-fixes.md` covers the
 hand-written patches in `15-ours` and the substituted upstream refs.
