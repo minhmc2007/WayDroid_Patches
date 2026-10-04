@@ -1,0 +1,33 @@
+From a933cef2b7ee5bfaf204ec749250a0cd14be36ee Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Sun, 4 Oct 2026 21:17:36 +0700
+Subject: [PATCH] mesa: scrape the libva version from where libva actually is
+
+meson.build:782:9: ERROR: Dependency lookup for libva with method
+'pkg-config' failed: Invalid version, need 'libva' ['>= 1.8.0'] found '.'.
+
+LIBVA_DIR was external/libva, which the swap in 20-aosp-swaps.xml removes in
+favour of hardware/intel/common/libva. The sed that reads
+va_api_major_version and va_api_minor_version therefore matched nothing and
+both variables came out empty, so the generated libva.pc had no version.
+
+Intel's libva declares the same two variables, so only the path changes.
+libva and libva_headers are already defined by its Android.bp, which is what
+LOCAL_SHARED_LIBRARIES and LOCAL_HEADER_LIBRARIES below ask for.
+---
+ android/Android.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/android/Android.mk b/android/Android.mk
+index 7452a7bf..ee2b7715 100644
+--- a/android/Android.mk
++++ b/android/Android.mk
+@@ -134,7 +134,7 @@ MESON_GEN_PKGCONFIGS += android.hardware.graphics.mapper:4.0
+ endif
+ 
+ ifeq ($(strip $(BOARD_MESA3D_GALLIUM_VA)),enabled)
+-LIBVA_DIR := external/libva
++LIBVA_DIR := hardware/intel/common/libva
+ LIBVA_VERSION_MAJOR := $(shell sed -n -e 's/va_api_major_version *= *//p' $(LIBVA_DIR)/meson.build)
+ LIBVA_VERSION_MINOR := $(shell sed -n -e 's/va_api_minor_version *= *//p' $(LIBVA_DIR)/meson.build)
+ MESON_GEN_PKGCONFIGS += libva:$(LIBVA_VERSION_MAJOR).$(LIBVA_VERSION_MINOR)
