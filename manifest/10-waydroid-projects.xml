@@ -27,10 +27,7 @@
   <project path="external/libsndfile" name="WayDroid-ATV/android_external_libsndfile" remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
   <project path="external/pulseaudio" name="WayDroid-ATV/android_external_pulseaudio" remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
 
-  <!-- mesa3d is left alone entirely. Upstream adds the fork at external/mesa
-       without removing LineageOS' external/mesa3d, which duplicates nine
-       modules, and no fork branch has src/gfxstream/aemu for Android 15's
-       gfxstream magma. See 20-aosp-swaps.xml. -->
+  <!-- mesa is a swap, not an addition. See 20-aosp-swaps.xml. -->
   <project path="external/hbm-prebuilts" name="android-generic/external_hbm-prebuilts" remote="ghub" clone-depth="1" revision="refs/heads/11" />
   <project path="hardware/intel/external/minigbm-intel" name="WayDroid-ATV/android_hardware_intel_external_minigbm-intel" remote="ghub" clone-depth="1" revision="refs/heads/celadon/a16/master" />
 

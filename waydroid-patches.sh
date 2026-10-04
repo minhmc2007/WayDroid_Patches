@@ -305,7 +305,7 @@ cmd_manifest() {
     installed+=("$dest/20-aosp-swaps.xml")
     n=$((n+1))
     echo "installed $n fragments into $dest"
-    echo "aosp swaps enabled, 5 remove-project entries, see manifest/20-aosp-swaps.xml"
+    echo "aosp swaps enabled, 6 remove-project entries, see manifest/20-aosp-swaps.xml"
   else
     rm -f "$dest/20-aosp-swaps.xml"
     echo "installed $n fragments into $dest"

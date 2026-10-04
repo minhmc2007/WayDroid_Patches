@@ -1,0 +1,43 @@
+From db264bc21124669cf7f4a95d9499abe42b517870 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Sun, 4 Oct 2026 10:46:55 +0700
+Subject: [PATCH] mesa: build mesa_gfxstream_aemu from the aemu sources already
+ here
+
+error: hardware/google/gfxstream/guest/magma/Android.bp:22:1:
+"libmagma_android" depends on undefined module "mesa_gfxstream_aemu".
+
+The root Android.bp is a stub that satisfies A15+ dependency checks, and it
+declares mesa_gfxstream_aemu_headers but not the library itself. Android 15's
+gfxstream needs both; Android 16's does not. src/gfxstream/aemu is present and
+untouched, so the module is defined here rather than pulled from elsewhere.
+
+The stub headers module exported nothing, so consumers including Stream.h had
+no include path either.
+---
+ Android.bp | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/Android.bp b/Android.bp
+index 13ef1826..60d28267 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -29,6 +29,18 @@ cc_library_headers {
+     name: "mesa_gfxstream_aemu_headers",
+     defaults: ["mesa_stub_defaults"],
+     host_supported: true,
++    export_include_dirs: ["src/gfxstream/aemu/include"],
++}
++
++cc_library_static {
++    name: "mesa_gfxstream_aemu",
++    defaults: ["mesa_stub_defaults"],
++    host_supported: true,
++    header_libs: ["mesa_gfxstream_aemu_headers"],
++    srcs: [
++        "src/gfxstream/aemu/ring_buffer.cpp",
++        "src/gfxstream/aemu/Stream.cpp",
++    ],
+ }
+ 
+ cc_library_headers {

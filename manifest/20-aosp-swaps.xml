@@ -15,21 +15,29 @@
     LineageOS-maintained project would defeat the repo, since those are patched
     in place via 10-lineage-forks.
 
-    22.2 swaps five, down from seven on 23.2: drm_hwcomposer and
-    rust/ninja-to-soong are no longer swapped, and gmmlib/media-driver move
-    under hardware/intel/common/.
+    22.2 swaps six: drm_hwcomposer and rust/ninja-to-soong from 23.2 are gone,
+    gmmlib/media-driver move under hardware/intel/common/, and mesa3d is
+    replaced by the fork at external/mesa.
   -->
 
   <!--
-    mesa is deliberately NOT swapped on Android 15. Upstream 22.2 adds the
-    fork at external/mesa without removing LineageOS' external/mesa3d, which
-    collides on mesa_src_headers and six other modules. Swapping in place is no
-    better: hardware/google/gfxstream/guest/magma depends on mesa_gfxstream_aemu,
-    which no WayDroid-ATV/android_external_mesa3d branch provides, checked on
-    lineage-18.1 and every lineage-18.1-mesa-* branch. LineageOS' own copy is kept
-    unpatched instead, which is what this repo prefers anyway since mesa3d is
-    LineageOS-maintained.
+    mesa is a swap, not an addition. Upstream 22.2 adds the fork at
+    external/mesa but never removes LineageOS' external/mesa3d, so both trees
+    reach the module list and bootstrap dies with "module mesa_src_headers
+    already defined" plus eight more.
+
+    The fork has to win. device/waydroid/waydroid/BoardConfig.mk sets
+    BOARD_MESA3D_USES_MESON_BUILD, and the fork's android/Android.mk is the
+    only definition of libgbm_mesa, libEGL_mesa and libgallium_dri in the whole
+    tree, all three of which device.mk puts in PRODUCT_PACKAGES. LineageOS'
+    mesa3d has no src/gbm/Android.bp at all.
+
+    This is the sixth remove-project, and it drops a LineageOS-maintained
+    project, so it is a deliberate deviation from "never re-point LineageOS".
+    Reverting it costs the GL stack: nothing else builds libgbm_mesa.
   -->
+  <remove-project name="platform/external/mesa3d" />
+  <project path="external/mesa" name="WayDroid-ATV/android_external_mesa3d" remote="ghub" clone-depth="1" revision="refs/heads/lineage-18.1" />
 
   <remove-project name="platform/external/minigbm" />
   <project path="external/minigbm" name="WayDroid-ATV/android_external_minigbm" remote="ghub" clone-depth="1" revision="refs/heads/lineage-21" />
