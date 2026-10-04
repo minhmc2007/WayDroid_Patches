@@ -75,13 +75,14 @@ LineageOS commits behind, and those stay untouched. Six projects:
 `hardware/interfaces` were forks too; on 22.2 upstream ships them verbatim
 instead, so they moved to layer 20. GPL-3.0.
 
-`15-ours` (0) — empty. Every patch in it is a fix for a build failure, and no
-Android 15 build has been run yet, so there is nothing to record.
-`docs/build-fixes.md` explains the layer.
+`15-ours` (2) — hand-written fixes, one per build failure so far:
+`vendor/gapps/0001` and `external/libsndfile/0001`. Apache-2.0.
+`docs/build-fixes.md` explains each and quotes the error it came from.
 
-`20-upstream` (52) — upstream's `base-patches-35` plus the `roms-patches`
-conflict fallbacks. Written against the forks, so it goes **after** layer 10.
-GPL-3.0.
+`20-upstream` (53) — upstream's `base-patches-35` plus the `roms-patches`
+conflict fallbacks and three `hardware/intel/common` patches upstream authored
+but never moved into `base-patches-35`. Written against the forks, so it goes
+**after** layer 10. GPL-3.0.
 
 `packages/apps/TvSettings` has no patches on purpose: its fork sits 2 commits
 *behind* LineageOS, so the delta is empty and the directory is not created.
@@ -108,7 +109,23 @@ tree. It is re-emitted with the `Android.bp` hunk dropped and the missing
 
 `lineage-21` rather than `lineage-23.0` for `hardware/waydroid` because
 `lineage-23.0` adds a `window/1.3` HAL that Android 15 has no consumer for.
-`cinnamonbun` is the Android 15 platform branch of `android_vendor_gapps`.
+`cinnamonbun` is the Android 15 platform branch of `android_vendor_gapps`; there
+is no `vendor/gapps_tv` on it, this is a phone build.
+
+**mesa is not swapped.** Upstream adds the fork at `external/mesa` and never
+removes LineageOS' `external/mesa3d`, so both land in the module list and soong
+dies with `module "mesa_src_headers" already defined`. Swapping in place fails
+differently: `hardware/google/gfxstream/guest/magma` on Android 15 depends on
+`mesa_gfxstream_aemu`, which no branch of the fork provides. `lineage-18.1` and
+all fourteen `lineage-18.1-mesa-*` branches were checked. So `mesa3d` stays
+unpatched. On Android 16 the swap works because Android 16's gfxstream does not
+need that module.
+
+**GApps `apps` property.** `prebuilt_apex` gained `apps` after Android 15, and
+`cinnamonbun` head `74fba8f` uses it. That is the only commit touching
+`x86_64/Android.bp` on the branch, so there is no older revision to pin. Layer
+15 drops the property.
+
 `tools/check-dup-modules.py` is the preflight for the module-collision class of
 bug these swaps invite.
 
@@ -136,9 +153,8 @@ tools/gen-fork-patches.sh <los-root> "$PWD/base-patches-35/10-lineage-forks" fra
 Not driven by this repo. In an envsetup'd shell:
 
 ```shell
-lunch lineage_waydroid_x86_64-bp4a-userdebug
-mka systemimage
-mka vendorimage
+lunch lineage_waydroid_x86_64-bp1a-userdebug
+m -j12 systemimage vendorimage
 ```
 
 Two environment gotchas:
@@ -151,15 +167,13 @@ Two environment gotchas:
 * 15 GB of RAM is under what kati wants; it was `SIGKILL`ed at "finishing Make
   module rules". A big swap file helps but does not remove the need for RAM.
 
-`docs/tools.md` covers the tooling. `docs/build-fixes.md` covers the six
-hand-written patches in `15-ours`,
-including the mesa-tools `libxml2.so.2` soname alias, which is an alias and not
-the library LLVM 20 was built against.
+`docs/tools.md` covers the tooling. `docs/build-fixes.md` covers the
+hand-written patches in `15-ours` and the substituted upstream refs.
 
 ## Provenance
 
 `10-lineage-forks/` and `20-upstream/` derive from
 [WayDroid-ATV/android_vendor_waydroid](https://github.com/WayDroid-ATV/android_vendor_waydroid)
-branch `lineage-23.2` and are GPL-3.0. `15-ours/`, `waydroid-patches.sh` and
+branch `lineage-22.2` and are GPL-3.0. `15-ours/`, `waydroid-patches.sh` and
 `tools/` are ours under Apache-2.0 (`LICENSE-APACHE-2.0`). The layers are split
 so the two licences never overlap. See `LICENSE-NOTES.md`.

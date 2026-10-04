@@ -1,0 +1,45 @@
+From d8a18205f5d4ffef79aeb0554c9f0ff8a3471f49 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Sun, 4 Oct 2026 10:00:15 +0700
+Subject: [PATCH] libsndfile: name the library module libsndfile12
+
+error: external/pulseaudio/src/Android.bp:82:1: "libpulse" depends on
+undefined module "libsndfile12".
+
+Upstream 22.2 pairs the pulseaudio fork at lineage-20 with the libsndfile
+fork at lineage-20, but the two disagree. pulseaudio was written against
+AOSP's external/libsndfile, which names the soname-versioned module
+libsndfile12; the fork kept the older AOSP name libsndfile_linux. LineageOS
+22.2 has no external/libsndfile of its own, so nothing else supplies the
+name.
+
+Nothing outside this Android.bp references libsndfile_linux. The remaining
+libsndfile hits in the tree are host test targets that are not part of a
+phone build. Renaming is enough; pulseaudio reaches the headers through
+include_dirs, not through the module.
+---
+ Android.bp | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/Android.bp b/Android.bp
+index 6156f05..ac53ffe 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -9,14 +9,14 @@ license {
+ }
+ 
+ cc_defaults {
+-    name: "libsndfile_linux_defaults",
++    name: "libsndfile12_defaults",
+     c_std: "gnu99",
+     cflags: ["-Wall"],
+ }
+ 
+ cc_library_shared {
+-    name: "libsndfile_linux",
+-    defaults: ["libsndfile_linux_defaults"],
++    name: "libsndfile12",
++    defaults: ["libsndfile12_defaults"],
+     vendor: true,
+ 
+     srcs: [

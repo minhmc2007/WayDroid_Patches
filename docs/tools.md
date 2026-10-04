@@ -1,6 +1,6 @@
 # Tools
 
-Four scripts. All are read-only with respect to your LineageOS tree except
+Five scripts. All are read-only with respect to your LineageOS tree except
 `gen-fork-patches.sh`, which writes into the patch repo.
 
 ## `waydroid-patches.sh`
@@ -77,7 +77,9 @@ The `action` column is the useful part:
 
 Preflight for the mistake that cost the most time here: adding a project at a
 path the ROM manifest does not have, when the *same upstream project* is
-already present at a *different* path.
+already present at a *different* path. Upstream's Android 15 manifest has this
+bug with mesa, which it adds at `external/mesa` while LineageOS ships
+`external/mesa3d`.
 
 ```shell
 python3 tools/check-dup-modules.py <src>
