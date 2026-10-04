@@ -16,8 +16,19 @@
     in place via 10-lineage-forks.
 
     22.2 swaps five, down from seven on 23.2: drm_hwcomposer and
-    rust/ninja-to-soong are no longer swapped, mesa3d is a plain addition at
-    external/mesa, and gmmlib/media-driver move under hardware/intel/common/.
+    rust/ninja-to-soong are no longer swapped, and gmmlib/media-driver move
+    under hardware/intel/common/.
+  -->
+
+  <!--
+    mesa is deliberately NOT swapped on Android 15. Upstream 22.2 adds the
+    fork at external/mesa without removing LineageOS' external/mesa3d, which
+    collides on mesa_src_headers and six other modules. Swapping in place is no
+    better: hardware/google/gfxstream/guest/magma depends on mesa_gfxstream_aemu,
+    which no WayDroid-ATV/android_external_mesa3d branch provides, checked on
+    lineage-18.1 and every lineage-18.1-mesa-* branch. LineageOS' own copy is kept
+    unpatched instead, which is what this repo prefers anyway since mesa3d is
+    LineageOS-maintained.
   -->
 
   <remove-project name="platform/external/minigbm" />
