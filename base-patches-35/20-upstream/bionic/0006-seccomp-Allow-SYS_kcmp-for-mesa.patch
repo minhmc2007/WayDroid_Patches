@@ -1,0 +1,24 @@
+From fffcc4fb0a645f4ae215c32e0ce0f0a72c479b75 Mon Sep 17 00:00:00 2001
+From: Alessandro Astone <ales.astone@gmail.com>
+Date: Sun, 26 Jun 2022 11:22:00 +0200
+Subject: [PATCH 6/6] seccomp: Allow SYS_kcmp for mesa
+
+Change-Id: I93fba0c397259e90bb1829fe0d7a36b52de94023
+---
+ libc/SECCOMP_ALLOWLIST_COMMON.TXT | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/libc/SECCOMP_ALLOWLIST_COMMON.TXT b/libc/SECCOMP_ALLOWLIST_COMMON.TXT
+index 1d58475..06ac6ee 100644
+--- a/libc/SECCOMP_ALLOWLIST_COMMON.TXT
++++ b/libc/SECCOMP_ALLOWLIST_COMMON.TXT
+@@ -82,3 +82,6 @@ int sched_rr_get_interval_time64(pid_t, timespec64*) lp32
+ # support seems potentially useful for Android (though the struct that
+ # changes size over time is obviously problematic).
+ pid_t clone3(clone_args*, size_t) all
++
++# mesa
++int kcmp(pid_t pid1, pid_t pid2, int type, unsigned long idx1, unsigned long idx2) all
+-- 
+2.52.0
+

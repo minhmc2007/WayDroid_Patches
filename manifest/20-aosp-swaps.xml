@@ -1,90 +1,55 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
   <!--
-    ===========================================================================
-    OPT-IN. Not installed by `./waydroid-patches.sh manifest`.
-    Install with:  ./waydroid-patches.sh manifest <source-dir>
-                  (option: with-aosp-swaps)
+    OPT-IN, not installed by `waydroid-patches.sh manifest`. Pass with-aosp-swaps.
 
-    WHY THIS FILE EXISTS
-    `repo` has NO way to point an existing project at a different upstream
-    repository. Verified against the manifest parser that ships with this
-    checkout (.repo/repo/manifest_xml.py):
+    repo cannot point an existing project at a different upstream. Verified in
+    .repo/repo/manifest_xml.py: a second <project path="X"> is "duplicate path X"
+    (recursively_add_projects, l.1452), and <extend-project> keeps the original
+    project name so the fetch URL stays under platform/. So a swap is only
+    expressible as <remove-project> + <project>, which is why upstream does the
+    same.
 
-      * <project path="X" .../>            -> "duplicate path X"
-                                            (recursively_add_projects, l.1452)
-      * <extend-project name="..." remote=... revision=.../>
-                                          -> allowed, but keeps the ORIGINAL
-                                             project name, so the fetch URL
-                                             becomes <fetch>/platform/external/<x>
-                                             instead of the Waydroid fork.
+    Keep this short. These five are AOSP-remote display/media trees that no ROM
+    maintains, so losing LineageOS commits in them costs nothing. Swapping a
+    LineageOS-maintained project would defeat the repo, since those are patched
+    in place via 10-lineage-forks.
 
-    So swapping e.g. platform/external/mesa3d for
-    WayDroid-ATV/android_external_mesa3d is only expressible as
-    <remove-project> + <project>. There is no workaround inside the manifest
-    format; this is why upstream WayDroid-ATV does exactly this too.
-
-    SCOPE - keep this list as short as possible.
-    These seven are the AOSP-remote display/media/rust trees. They are NOT
-    LineageOS-maintained and essentially no custom ROM touches them, so losing
-    upstream LineageOS commits in them costs nothing. Swapping any
-    LineageOS-maintained project (frameworks/*, system/*, hardware/*, ...)
-    would defeat the whole point of this repo - those are patched in place via
-    base-patches-36/10-lineage-forks instead.
-  ===========================================================================
+    22.2 swaps five, down from seven on 23.2: drm_hwcomposer and
+    rust/ninja-to-soong are no longer swapped, mesa3d is a plain addition at
+    external/mesa, and gmmlib/media-driver move under hardware/intel/common/.
   -->
 
-  <!-- Display stack: Wayland/DRM/KMS for a container with no kernel modesetting -->
-  <remove-project name="platform/external/drm_hwcomposer" />
-  <project path="external/drm_hwcomposer" name="android-generic/external_drm_hwcomposer" remote="ghub" clone-depth="1" revision="refs/heads/main" />
-
   <remove-project name="platform/external/minigbm" />
-  <project path="external/minigbm" name="WayDroid-ATV/android_external_minigbm" remote="ghub" clone-depth="1" revision="refs/heads/lineage-23.2" />
-
-  <remove-project name="platform/external/mesa3d" />
-  <project path="external/mesa3d" name="WayDroid-ATV/android_external_mesa3d" remote="ghub" clone-depth="1" revision="refs/heads/lineage-18.1" />
+  <project path="external/minigbm" name="WayDroid-ATV/android_external_minigbm" remote="ghub" clone-depth="1" revision="refs/heads/lineage-21" />
 
   <remove-project name="platform/external/libdrm" />
   <project path="external/libdrm" name="WayDroid-ATV/android_external_libdrm" remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
 
   <!--
-    gmmlib. Intel's media-driver 26.1.5 (synced above as
-    vendor/intel/media-driver) needs IGFX_NVL_XE3G, which is declared only
-    by intel/gmmlib at tag intel-gmmlib-22.10.0. LineageOS's
-    platform/external/gmmlib has no IGFX_NVL ids at all, so building
-    media-driver against it gives 7 undeclared-identifier errors in
-    media_interfaces_nvls.cpp.
+    media-driver needs IGFX_NVL ids that LineageOS' gmmlib does not declare. Both
+    trees expose libigdgmm_android with no soong_namespace, so syncing both fails
+    bootstrap with "module already defined".
 
-    This is the same duplication that made gmmlib a candidate for dropping
-    earlier, but dropping it was wrong: it is not that gmmlib is redundant,
-    it is that intel's tree is a different, newer revision than LineageOS's.
-    Removing LineageOS's copy and adding intel's is the only way to get
-    IGFX_NVL_XE3G, and media-driver is useless without it.
-
-    Note 0001-Android.bp-Update-source-file-list.patch adds
-    GmmXe3P_XPCCachePolicy.cpp, which exists only in intel's snapshot and
-    not in LineageOS's, so it is needed here where it was not needed there.
+    Upstream points at projectceladon tags v22.8.0 and v25.2.6, but those tags no
+    longer exist: projectceladon/gmmlib has only media_driver_rebase_2022_Q3 and
+    projectceladon/media-driver has no tags at all. intel's trees are used
+    instead, at the tags our Android 16 build already proved.
   -->
   <remove-project name="platform/external/gmmlib" />
-  <project path="vendor/intel/gmmlib" name="intel/gmmlib" remote="ghub" clone-depth="1" revision="refs/tags/intel-gmmlib-22.10.0" />
+  <project path="hardware/intel/common/gmmlib" name="intel/gmmlib" remote="ghub" clone-depth="1" revision="refs/tags/intel-gmmlib-22.10.0" />
 
-  <!-- VA-API userspace -->
+  <remove-project name="platform/external/intel-media-driver" />
+  <project path="hardware/intel/common/media-driver" name="intel/media-driver" remote="ghub" clone-depth="1" revision="refs/tags/intel-media-26.1.5" />
+
   <remove-project name="platform/external/libva" />
-  <project path="external/libva" name="WayDroid-ATV/android_external_libva" remote="ghub" clone-depth="1" revision="refs/heads/14-x86" />
-
-  <remove-project name="platform/external/libva-utils" />
-  <project path="external/libva-utils" name="intel/libva-utils" remote="ghub" clone-depth="1" revision="refs/tags/2.23.0" />
-
-  <!-- Rust build glue (waydroid builds hostbm via ninja, not Soong) -->
-  <remove-project name="platform/external/rust/ninja-to-soong" />
-  <project path="external/rust/ninja-to-soong" name="WayDroid-ATV/android_external_rust_ninja-to-soong" remote="ghub" clone-depth="1" revision="refs/heads/main" />
+  <project path="hardware/intel/common/libva" name="WayDroid-ATV/hardware_intel_common_libva" remote="ghub" clone-depth="1" revision="refs/heads/14-x86" />
 
   <!--
-    Optional. Uncomment ONLY if a build failure proves the LineageOS/AOSP
-    android-crates-io is the problem - LineageOS already pins the
-    android-16.0.0_r4 tag, which should be correct for SDK 36.
+    Uncomment only if android-crates-io proves to be the problem. LineageOS 22.2
+    pins the android-15.0.0 tag, correct for SDK 35. Upstream 22.2 does not swap it.
 
   <remove-project name="platform/external/rust/android-crates-io" />
-  <project path="external/rust/android-crates-io" name="WayDroid-ATV/android_external_rust_android-crates-io" remote="ghub" clone-depth="1" revision="refs/heads/android16-qpr2-release" />
+  <project path="external/rust/android-crates-io" name="WayDroid-ATV/android_external_rust_android-crates-io" remote="ghub" clone-depth="1" revision="refs/heads/android15-qpr2-release" />
   -->
 </manifest>

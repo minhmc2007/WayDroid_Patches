@@ -1,0 +1,36 @@
+From 8db570650fdeeb3c08c6ecf87e9bf1a3e6f94e5d Mon Sep 17 00:00:00 2001
+From: Pierre-Hugues Husson <phh@phh.me>
+Date: Wed, 13 Oct 2021 10:56:52 -0400
+Subject: [PATCH] Support no-bpf usecase
+
+Change-Id: I75a427a2a41aa4ab1104ad88a891bef0dc2d9c91
+---
+ loader/Loader.cpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/loader/Loader.cpp b/loader/Loader.cpp
+index 51e9d92..a026002 100644
+--- a/loader/Loader.cpp
++++ b/loader/Loader.cpp
+@@ -47,6 +47,7 @@
+ #include <android-base/cmsg.h>
+ #include <android-base/file.h>
+ #include <android-base/logging.h>
++#include <android-base/properties.h>
+ #include <android-base/strings.h>
+ #include <android-base/unique_fd.h>
+
+@@ -1022,8 +1023,8 @@ void legacyBpfLoader() {
+             ALOGE("If this triggers randomly, you might be hitting some memory allocation "
+                   "problems or startup script race.");
+             ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
+-            sleep(20);
+-            exit(121);
++            android::base::SetProperty("bpf.progs_loaded", "1");
++            return;
+         }
+     }
+ }
+--
+2.52.0
+

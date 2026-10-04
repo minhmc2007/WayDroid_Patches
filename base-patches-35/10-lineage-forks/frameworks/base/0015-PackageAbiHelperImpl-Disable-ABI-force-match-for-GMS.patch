@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SupeChicken666 <me@supechicken666.dev>
+Date: Thu, 26 Feb 2026 22:30:51 +0800
+Subject: [PATCH 15/15] PackageAbiHelperImpl: Disable ABI force match for GMS
+
+Required for using ARM64 GMS on x86-64
+
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ .../core/java/com/android/server/pm/PackageAbiHelperImpl.java  | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/services/core/java/com/android/server/pm/PackageAbiHelperImpl.java b/services/core/java/com/android/server/pm/PackageAbiHelperImpl.java
+index 7229f070acf..79cbacb6815 100644
+--- a/services/core/java/com/android/server/pm/PackageAbiHelperImpl.java
++++ b/services/core/java/com/android/server/pm/PackageAbiHelperImpl.java
+@@ -390,7 +390,8 @@ final class PackageAbiHelperImpl implements PackageAbiHelper {
+                 // 2. cpuAbiOverride is null. If it is non-null, it is set via shell for testing
+                 final boolean forceMatch = Flags.forceMultiArchNativeLibsMatch()
+                         && pkg.getTargetSdkVersion() >= Build.VERSION_CODES.VANILLA_ICE_CREAM
+-                        && cpuAbiOverride == null;
++                        && cpuAbiOverride == null
++                        && !pkg.getPackageName().equals("com.google.android.gms");
+ 
+                 String[] supported32BitAbis = forceMatch ? getNativelySupported32BitAbis()
+                         : Build.SUPPORTED_32_BIT_ABIS;

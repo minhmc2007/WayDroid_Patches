@@ -1,0 +1,30 @@
+From 1a97e8e30597d840f6e52b80933207b83ef424d5 Mon Sep 17 00:00:00 2001
+From: SupeChicken666 <me@supechicken666.dev>
+Date: Mon, 8 Sep 2025 17:12:13 +0000
+Subject: [PATCH] Fix building
+
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ Android.bp | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/Android.bp b/Android.bp
+index c557b22..d66a093 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -99,6 +99,12 @@ cc_library_shared {
+         "-fno-omit-frame-pointer",
+         "-march=corei7",
+         "-Werror",
++        "-Wno-unused-local-typedef",
++        "-Wno-unused-parameter",
++        "-Wno-unused-private-field",
++        "-Wno-unused-variable",
++        "-Wno-missing-field-initializers",
++        "-Wno-pragma-pack-suspicious-include",
+         "-Wno-logical-op-parentheses",
+         "-Wno-shift-negative-value",
+         "-Wno-unused-parameter",
+-- 
+2.50.1
+

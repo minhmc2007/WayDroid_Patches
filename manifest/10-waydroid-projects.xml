@@ -1,87 +1,64 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
   <!--
-    ===========================================================================
-    WayDroid ATV on LineageOS 23.2 / SDK 36 - PHONE build (not TV).
+    WayDroid ATV on LineageOS 22.2 / SDK 35, phone build.
 
-    This fragment is PURE ADDITION. It contains:
-      * zero <remove-project>
-      * zero overrides of any project the LineageOS manifest already provides
+    Mirrors upstream manifest_scripts/manifests-35/02-waydroid.xml at
+    WayDroid-ATV/android_vendor_waydroid@lineage-22.2, minus the six projects
+    upstream remove-projects and re-adds as forks. Those stay as the plain
+    LineageOS checkout and are patched in place: frameworks/base, frameworks/av,
+    frameworks/native, system/core, lineage-sdk, packages/apps/TvSettings. See
+    base-patches-35/10-lineage-forks/.
 
-    Only repos that do not exist in LineageOS at all are synced here.
-
-    Everything LineageOS *does* provide (frameworks/base, frameworks/av,
-    frameworks/native, frameworks/waydroid deps, system/core, system/vold,
-    hardware/interfaces, hardware/libhardware, lineage-sdk, bionic,
-    build/soong, packages/*, system/linkerconfig, ...) is kept as the plain
-    LineageOS checkout and patched in place by waydroid-patches.sh.
-
-    See base-patches-36/10-lineage-forks/ for the fork deltas that stand in for
-    the projects upstream WayDroid-ATV replaces with forks.
-  ===========================================================================
+    The five AOSP swaps upstream also does are in 20-aosp-swaps.xml, opt-in.
   -->
 
-  <!-- ============ Waydroid core ============ -->
-  <project path="device/waydroid/waydroid"       name="WayDroid-ATV/android_device_waydroid_waydroid"     remote="ghub" clone-depth="1" revision="refs/heads/lineage-23.2" />
-  <project path="frameworks/waydroid"            name="WayDroid-ATV/android_frameworks_waydroid"           remote="ghub" clone-depth="1" revision="refs/heads/lineage-23.0" />
-  <project path="hardware/waydroid"              name="WayDroid-ATV/android_hardware_waydroid"             remote="ghub" clone-depth="1" revision="refs/heads/lineage-23.0" />
-  <project path="vendor/extra"                   name="WayDroid-ATV/android_vendor_waydroid"                remote="ghub" clone-depth="1" revision="refs/heads/lineage-23.2" />
-  <project path="vendor/waydroid/init"           name="WayDroid-ATV/android_vendor_waydroid_init"          remote="ghub" clone-depth="1" revision="refs/heads/main" />
-  <project path="packages/apps/WaydroidUpdater"  name="WayDroid-ATV/android_packages_apps_WaydroidUpdater" remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
+  <project path="device/waydroid/waydroid" name="WayDroid-ATV/android_device_waydroid_waydroid" remote="ghub" clone-depth="1" revision="refs/heads/lineage-22.2" />
 
-  <!-- ============ Audio ============ -->
-  <project path="external/libsndfile"            name="WayDroid-ATV/android_external_libsndfile"           remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
-  <project path="external/pulseaudio"            name="WayDroid-ATV/android_external_pulseaudio"           remote="ghub" clone-depth="1" revision="refs/heads/lineage-21" />
+  <!-- lineage-22.2 was deleted upstream; lineage-21 is the nearest branch that
+       predates Android 16. lineage-23.0 adds a window/1.3 HAL that A15 has no
+       consumer for. -->
+  <project path="hardware/waydroid" name="WayDroid-ATV/android_hardware_waydroid" remote="ghub" clone-depth="1" revision="refs/heads/lineage-21" />
+  <project path="vendor/extra" name="WayDroid-ATV/android_vendor_waydroid" remote="ghub" clone-depth="1" revision="refs/heads/lineage-22.2" />
+  <project path="packages/apps/WaydroidUpdater" name="WayDroid/android_packages_apps_WaydroidUpdater" remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
 
-  <!-- ============ Build / toolchain ============
-       external/llvm-project is NOT in the LineageOS manifest (LineageOS builds
-       against prebuilts/clang), so it is a plain addition here. It does need the
-       upstream patch external/llvm-project/0001-Fix-building-on-A16.patch, which
-       applies to this checkout just like it does upstream. -->
-  <project path="external/llvm-project"          name="android-generic/external_llvm-project"             remote="ghub" clone-depth="1" revision="refs/heads/release_22.x" />
-  <project path="external/rust/hbm"              name="WayDroid-ATV/android_external_rust_hbm"              remote="ghub" clone-depth="1" revision="refs/heads/main" />
-  <project path="prebuilts/mesa-tools"           name="WayDroid/android_prebuilts_mesa-tools"              remote="ghub" groups="pdk" clone-depth="1" revision="refs/heads/main" />
+  <project path="external/alsa-lib" name="WayDroid-ATV/android_external_alsa-lib" remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
+  <project path="external/alsa-plugins" name="WayDroid-ATV/android_external_alsa-plugins" remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
+  <project path="external/libsndfile" name="WayDroid-ATV/android_external_libsndfile" remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
+  <project path="external/pulseaudio" name="WayDroid-ATV/android_external_pulseaudio" remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
 
-  <!-- ============ Media ============ -->
-  <project path="external/ffmpeg"                name="WayDroid-ATV/android_external_ffmpeg"               remote="ghub" clone-depth="1" revision="refs/heads/release/7.1/14-x86" />
-  <project path="external/stagefright-plugins"   name="WayDroid-ATV/android_external_stagefright-plugins"  remote="ghub" clone-depth="1" revision="refs/heads/14-x86/ffmpeg-7.1" />
-  <project path="external/redroid-prebuilts"     name="WayDroid-ATV/android_external_redroid-prebuilts"    remote="ghub" clone-depth="1" revision="refs/heads/master" />
+  <!-- repo name keeps the old android_external_mesa3d spelling -->
+  <project path="external/mesa" name="WayDroid-ATV/android_external_mesa3d" remote="ghub" clone-depth="1" revision="refs/heads/lineage-18.1" />
+  <project path="external/hbm-prebuilts" name="android-generic/external_hbm-prebuilts" remote="ghub" clone-depth="1" revision="refs/heads/11" />
+  <project path="hardware/intel/external/minigbm-intel" name="WayDroid-ATV/android_hardware_intel_external_minigbm-intel" remote="ghub" clone-depth="1" revision="refs/heads/celadon/a16/master" />
 
-  <!-- ============ VA-API (intel) ============
-       gmmlib is deliberately NOT synced here. LineageOS already provides it as
-       platform/external/gmmlib at external/gmmlib, and intel/gmmlib is the same
-       project with the same Soong module names (external_gmmlib_license,
-       libigdgmm_android, libigdgmm_headers) and no soong_namespace, so syncing
-       both makes soong bootstrap fail with "module already defined". The two
-       upstream gmmlib patches apply cleanly to the LineageOS copy, so
-       base-patches-36/20-upstream/external/gmmlib/ patches that instead and this
-       project is simply not added. -->
-  <project path="vendor/intel/media-driver"      name="intel/media-driver"                                 remote="ghub" clone-depth="1" revision="refs/tags/intel-media-26.1.5" />
-  <project path="vendor/intel/vaapi-driver"      name="WayDroid-ATV/android_vendor_intel_vaapi-driver"     remote="ghub" clone-depth="1" revision="refs/heads/14-x86" />
+  <project path="external/llvm-project" name="WayDroid/android_external_llvm-project" remote="ghub" clone-depth="1" revision="refs/heads/lineage-18.1" />
+  <project path="prebuilts/mesa-tools" name="WayDroid/android_prebuilts_mesa-tools" remote="ghub" groups="pdk" clone-depth="1" revision="refs/heads/main" />
 
-  <!-- ============ Widevine / native bridge ============ -->
-  <project path="vendor/google/proprietary/widevine-prebuilt"         name="supremegamers/vendor_google_proprietary_widevine-prebuilt"         remote="ghub" clone-depth="1" revision="refs/heads/celadon" />
-  <project path="vendor/google/proprietary/ndk_translation-prebuilt" name="WayDroid-ATV/vendor_google_proprietary_ndk_translation-prebuilt" remote="ghub" clone-depth="1" revision="refs/heads/16arm64_qpr2" />
+  <project path="external/ffmpeg" name="WayDroid-ATV/android_external_ffmpeg" remote="ghub" clone-depth="1" revision="refs/heads/release/7.0-14" />
+  <!-- 14-x86 was renamed upstream; this matches ffmpeg release/7.0-14 below -->
+  <project path="external/stagefright-plugins" name="WayDroid-ATV/external_stagefright-plugins" remote="ghub" clone-depth="1" revision="refs/heads/14-x86/ffmpeg-7.0" />
 
-  <!-- ============ GApps ============ -->
-  <project path="vendor/gapps"                   name="WayDroid-ATV/android_vendor_gapps"                 remote="ghub" clone-depth="1" revision="refs/heads/baklava" />
-  <project path="vendor/gapps_tv"                name="WayDroid-ATV/android_vendor_gapps_tv"              remote="ghub" clone-depth="1" revision="refs/heads/baklava" />
+  <project path="external/libva-utils" name="android-generic/external_libva-utils" remote="ghub" clone-depth="1" revision="refs/heads/14-x86" />
+  <project path="hardware/intel/common/vaapi" name="WayDroid-ATV/platform_hardware_intel_common_vaapi" remote="ghub" clone-depth="1" revision="refs/heads/14-x86" />
+  <project path="vendor/intel/mediasdk_c2" name="WayDroid-ATV/android_vendor_intel_mediasdk_c2" remote="ghub" clone-depth="1" revision="refs/heads/celadon/a16/master" />
+  <project path="vendor/intel/external/onevpl" name="projectceladon/libvpl" remote="ghub" clone-depth="1" revision="refs/heads/celadon/a16/master" />
+  <project path="vendor/intel/external/onevpl-gpu-rt" name="projectceladon/vpl-gpu-rt" remote="ghub" clone-depth="1" revision="refs/heads/celadon/a16/master" />
+
+  <project path="vendor/google/proprietary/widevine-prebuilt" name="supremegamers/vendor_google_proprietary_widevine-prebuilt" remote="ghub" clone-depth="1" revision="refs/heads/celadon" />
+  <project path="vendor/google/proprietary/ndk_translation-prebuilt" name="WayDroid-ATV/vendor_google_proprietary_ndk_translation-prebuilt" remote="ghub" clone-depth="1" revision="refs/heads/14arm_15arm64" />
+
+  <!-- upstream names WayDroid-ATV/vendor_gapps@vic, but that repo is deleted.
+       android_vendor_gapps@cinnamonbun is the Android 15 platform branch; there
+       is no vendor/gapps_tv on this branch, 22.2 is a phone build. -->
+  <project path="vendor/gapps" name="WayDroid-ATV/android_vendor_gapps" remote="ghub" clone-depth="1" revision="refs/heads/cinnamonbun" />
 
   <!--
-    Deliberately NOT synced from a fork, i.e. LineageOS' own copy is kept:
-
-      external/rust/android-crates-io
-        LineageOS tracks android.googlesource.com/platform/external/rust/android-crates-io
-        pinned at the android-16.0.0 tag, which is what SDK 36 wants. Upstream
-        WayDroid-ATV swaps in its own android16-qpr2-release branch. The AOSP
-        tree is equivalent for our purposes and swapping needs <remove-project>.
-        See 20-aosp-swaps.xml if a build ever demands the Waydroid variant.
-
-    Deliberately NOT synced, because it needs patching a LineageOS repo:
-
-      external/drm_hwcomposer, external/minigbm, external/mesa3d,
-      external/libdrm, external/libva, external/libva-utils,
-      external/rust/ninja-to-soong
-        See manifest/20-aosp-swaps.xml - opt-in, requires <remove-project>.
+    Not synced from a fork, LineageOS' own copy is kept:
+      external/rust/android-crates-io - LineageOS 22.2 pins the android-15.0.0
+        tag, which is what SDK 35 wants. Upstream 22.2 does not swap it.
+      external/gmmlib, external/intel-media-driver, external/libdrm,
+      external/libva, external/minigbm - upstream swaps these five, see
+        20-aosp-swaps.xml.
   -->
 </manifest>

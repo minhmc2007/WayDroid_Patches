@@ -7,7 +7,7 @@ do not bleed into each other.
 |---|---|---|---|
 | `10-lineage-forks` | 140 | generated from upstream WayDroid commits | GPL-3.0 |
 | `15-ours` | 6 | hand-written here | Apache-2.0 |
-| `20-upstream` | 53 | verbatim upstream `base-patches-36` | GPL-3.0 |
+| `20-upstream` | 53 | verbatim upstream `base-patches-35` | GPL-3.0 |
 
 ## GPL-3.0
 
@@ -19,7 +19,7 @@ branch `lineage-23.2`, which is GPL-3.0.
 `git format-patch merge-base..fork-tip` over the WayDroid forks, so each patch
 is that project's upstream commit and inherits its licence.
 `20-upstream/` is a byte-identical copy of upstream's
-`waydroid-patches/base-patches-36` plus its `roms-patches` fallbacks.
+`waydroid-patches/base-patches-35` plus its `roms-patches` fallbacks.
 
 GPL-3.0 applies to the patch *text*. The trees they modify are the Android
 Open Source Project, licensed Apache-2.0 by Google, and the various upstream

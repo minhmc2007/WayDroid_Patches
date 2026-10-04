@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SupeChicken666 <me@supechicken666.dev>
+Date: Sun, 18 Jan 2026 20:50:31 +0800
+Subject: [PATCH 15/18] ueventd: Ignore non-block device uevent by default
+
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ init/devices.cpp         | 5 +++++
+ init/uevent_listener.cpp | 2 +-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/init/devices.cpp b/init/devices.cpp
+index aaf4fca7d..0eff33bae 100644
+--- a/init/devices.cpp
++++ b/init/devices.cpp
+@@ -31,6 +31,7 @@
+ #include <android-base/chrono_utils.h>
+ #include <android-base/file.h>
+ #include <android-base/logging.h>
++#include <android-base/properties.h>
+ #include <android-base/stringprintf.h>
+ #include <android-base/strings.h>
+ #include <fs_mgr.h>
+@@ -774,6 +775,10 @@ void DeviceHandler::HandleUevent(const Uevent& uevent) {
+         devpath = "/dev/" + Basename(uevent.path);
+     }
+ 
++    if (!(block || android::base::GetBoolProperty("persist.waydroid.uevent", false))) {
++        return;
++    }
++
+     mkdir_recursive(Dirname(devpath), 0755);
+ 
+     HandleDevice(uevent.action, devpath, block, uevent.major, uevent.minor, links);
+diff --git a/init/uevent_listener.cpp b/init/uevent_listener.cpp
+index d329c174f..8a9650c55 100644
+--- a/init/uevent_listener.cpp
++++ b/init/uevent_listener.cpp
+@@ -179,7 +179,7 @@ ListenerAction UeventListener::RegenerateUeventsForPath(const std::string& path,
+     return RegenerateUeventsForDir(d.get(), callback);
+ }
+ 
+-static const char* kRegenerationPaths[] = {"/sys/devices"};
++static const char* kRegenerationPaths[] = {"/sys/devices/virtual/block"};
+ 
+ void UeventListener::RegenerateUevents(const ListenerCallback& callback) const {
+     for (const auto path : kRegenerationPaths) {

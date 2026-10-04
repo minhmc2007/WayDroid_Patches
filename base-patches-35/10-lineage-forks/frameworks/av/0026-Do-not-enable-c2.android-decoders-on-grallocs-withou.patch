@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SupeChicken666 <me@supechicken666.dev>
+Date: Tue, 10 Feb 2026 22:15:55 +0800
+Subject: [PATCH 26/27] Do not enable c2.android decoders on grallocs without
+ YUV support
+
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ media/codec2/sfplugin/Codec2InfoBuilder.cpp | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/media/codec2/sfplugin/Codec2InfoBuilder.cpp b/media/codec2/sfplugin/Codec2InfoBuilder.cpp
+index e03604f46..8c8f9faa9 100644
+--- a/media/codec2/sfplugin/Codec2InfoBuilder.cpp
++++ b/media/codec2/sfplugin/Codec2InfoBuilder.cpp
+@@ -431,6 +431,8 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
+     // Codec2.0 software components have default rank 0x200.
+     int option = ::android::base::GetIntProperty("debug.stagefright.ccodec", 4);
+ 
++    const std::string c2_pixfmt = ::android::base::GetProperty("debug.ffmpeg-codec2.pixel_format", "YUV_420");
++
+     // Obtain Codec2Client
+     std::vector<Traits> traits = Codec2Client::ListComponents();
+ 
+@@ -563,6 +565,15 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
+             }
+             std::string canonName = trait.name;
+ 
++            // Waydroid: Do not enable c2.android decoders on unsupported grallocs
++            if (hasPrefix(canonName, "c2.android.") &&
++                c2_pixfmt != "YUV_420" &&
++                trait.domain == C2Component::DOMAIN_VIDEO &&
++                trait.kind == C2Component::KIND_DECODER
++            ) {
++                continue;
++            }
++
+             // TODO: Remove this block once all codecs are enabled by default.
+             switch (option) {
+             case 0:

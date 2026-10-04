@@ -4,7 +4,7 @@
 
 Waydroid and Waydroid-ATV changes as `.patch` files, layered on a stock LineageOS checkout. Meant to apply on almost any LineageOS-based ROM. No forks. Nothing LineageOS maintains gets removed or re-pointed.
 
-Default branch `lineage-23.2`. Phone build, not Android TV.
+Default branch `lineage-22.2`. Phone build, not Android TV.
 
 Read `README.md`, `docs/tools.md`, `docs/build-fixes.md` before touching anything.
 
@@ -12,9 +12,9 @@ Read `README.md`, `docs/tools.md`, `docs/build-fixes.md` before touching anythin
 
 | Path | What | Licence |
 | --- | --- | --- |
-| `base-patches-36/10-lineage-forks` | Waydroid-only commits, generated | GPL-3.0 |
-| `base-patches-36/15-ours` | hand-written build fixes | Apache-2.0 |
-| `base-patches-36/20-upstream` | upstream patches, verbatim | GPL-3.0 |
+| `base-patches-35/10-lineage-forks` | Waydroid-only commits, generated | GPL-3.0 |
+| `base-patches-35/15-ours` | hand-written build fixes | Apache-2.0 |
+| `base-patches-35/20-upstream` | upstream patches, verbatim | GPL-3.0 |
 | `manifest/` | repo manifest fragments | |
 | `tools/`, `waydroid-patches.sh` | tooling | Apache-2.0 |
 

@@ -75,7 +75,7 @@ The generated fork deltas are in `10-lineage-forks` and these are in `15-ours`,
 so each keeps its own licence and regenerating one does not disturb the other.
 
 ```shell
-tools/gen-fork-patches.sh <los-root> "$PWD/base-patches-36/10-lineage-forks" frameworks/base
+tools/gen-fork-patches.sh <los-root> "$PWD/base-patches-35/10-lineage-forks" frameworks/base
 ```
 
 `gen-fork-patches.sh` only writes the project paths it is asked for, so the

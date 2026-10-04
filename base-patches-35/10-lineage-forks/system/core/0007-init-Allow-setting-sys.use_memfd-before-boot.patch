@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Astone <ales.astone@gmail.com>
+Date: Fri, 18 Jul 2025 14:52:48 +0000
+Subject: [PATCH 07/18] init: Allow setting sys.use_memfd before boot
+
+Change-Id: I24ef1f5cbeb320fcd7bd5ea162562640eda7f95e
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ rootdir/init.rc | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/rootdir/init.rc b/rootdir/init.rc
+index 4df655163..9d1fb7ef6 100644
+--- a/rootdir/init.rc
++++ b/rootdir/init.rc
+@@ -1101,11 +1101,6 @@ on post-fs-data
+     # completed and apexd.status becomes "ready".
+     exec_start apexd-snapshotde
+ 
+-    # sys.memfd_use set to false by default, which keeps it disabled
+-    # until it is confirmed that apps and vendor processes don't make
+-    # IOCTLs on ashmem fds any more.
+-    setprop sys.use_memfd false
+-
+     # Set fscklog permission
+     chown root system /dev/fscklogs/log
+     chmod 0770 /dev/fscklogs/log
+@@ -1116,6 +1111,12 @@ on post-fs-data
+     # Update dm-verity state and set partition.*.verified properties.
+     verity_update_state
+ 
++# sys.memfd_use set to false by default, which keeps it disabled
++# until it is confirmed that apps and vendor processes don't make
++# IOCTLs on ashmem fds any more.
++on post-fs-data && property:sys.use_memfd=""
++    setprop sys.use_memfd false
++
+ on property:vold.checkpoint_committed=1
+     trigger post-fs-data-checkpointed
+ 

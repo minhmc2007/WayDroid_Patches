@@ -1,0 +1,29 @@
+From 21e4fb55de1476944461d7869075fbcb65916d0d Mon Sep 17 00:00:00 2001
+From: SupeChicken666 <me@supechicken666.dev>
+Date: Mon, 8 Sep 2025 17:10:24 +0000
+Subject: [PATCH] Fix building
+
+The Android.bp hunk of the upstream commit is dropped. Upstream targets
+projectceladon/media-driver at tag v25.2.6, which no longer exists, and no
+intel/media-driver tag ships an Android.bp at all. The Android.bp this project
+needs now comes from 0001-Add-Android.bp-for-building-with-AOSP.patch, so the
+common_cflags the dropped hunk edited are not there to edit. Only the missing
+errno.h include survives.
+
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ media_softlet/linux/common/os/i915/include/mos_bufmgr_api.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/media_softlet/linux/common/os/i915/include/mos_bufmgr_api.h b/media_softlet/linux/common/os/i915/include/mos_bufmgr_api.h
+index 4e67df8..7dcab82 100644
+--- a/media_softlet/linux/common/os/i915/include/mos_bufmgr_api.h
++++ b/media_softlet/linux/common/os/i915/include/mos_bufmgr_api.h
+@@ -28,6 +28,7 @@
+ #ifndef MOS_BUFMGR_API_H
+ #define MOS_BUFMGR_API_H
+ 
++#include <errno.h>
+ #include <stdio.h>
+ #include "drm.h"
+ #include "libdrm_macros.h"

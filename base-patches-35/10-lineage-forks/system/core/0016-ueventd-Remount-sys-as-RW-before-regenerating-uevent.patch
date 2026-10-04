@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SupeChicken666 <me@supechicken666.dev>
+Date: Sun, 18 Jan 2026 23:49:37 +0800
+Subject: [PATCH 16/18] ueventd: Remount /sys as RW before regenerating uevent
+
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ init/uevent_listener.cpp | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/init/uevent_listener.cpp b/init/uevent_listener.cpp
+index 8a9650c55..8e8df777e 100644
+--- a/init/uevent_listener.cpp
++++ b/init/uevent_listener.cpp
+@@ -21,6 +21,9 @@
+ #include <string.h>
+ #include <unistd.h>
+ 
++#include <sys/mount.h>
++#include <sys/wait.h>
++
+ #include <memory>
+ 
+ #include <android-base/logging.h>
+@@ -182,6 +185,15 @@ ListenerAction UeventListener::RegenerateUeventsForPath(const std::string& path,
+ static const char* kRegenerationPaths[] = {"/sys/devices/virtual/block"};
+ 
+ void UeventListener::RegenerateUevents(const ListenerCallback& callback) const {
++    pid_t pid = fork();
++
++    if (pid == 0) {
++        unshare(CLONE_NEWNS);
++        mount("sysfs", "/sys", "sysfs", MS_REMOUNT, NULL);
++    } else {
++        waitpid(pid, NULL, 0);
++    }
++
+     for (const auto path : kRegenerationPaths) {
+         if (RegenerateUeventsForPath(path, callback) == ListenerAction::kStop) return;
+     }

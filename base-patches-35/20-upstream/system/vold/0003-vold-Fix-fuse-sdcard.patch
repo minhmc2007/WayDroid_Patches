@@ -1,0 +1,28 @@
+From 81f18d4c9667c017d968d683acfa7b0429afbd83 Mon Sep 17 00:00:00 2001
+From: Ziyang Zhou <ziyang.zhou@outlook.com>
+Date: Sun, 22 Nov 2020 14:39:24 +0800
+Subject: [PATCH 3/8] vold: Fix fuse sdcard
+
+Change-Id: I4bb042fc3ddbbfaaddafbce81c1dcb8d1523c049
+---
+ model/EmulatedVolume.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/model/EmulatedVolume.cpp b/model/EmulatedVolume.cpp
+index 270dcd4..f45a6fc 100644
+--- a/model/EmulatedVolume.cpp
++++ b/model/EmulatedVolume.cpp
+@@ -364,8 +364,8 @@ status_t EmulatedVolume::doMount() {
+                     "-m",
+                     "-w",
+                     "-G",
+-                    "-i",
+-                    "-o",
++                    // "-i", HACKED
++                    // "-o",
+                     mRawPath.c_str(),
+                     label.c_str(),
+                     NULL)) {
+-- 
+2.52.0
+

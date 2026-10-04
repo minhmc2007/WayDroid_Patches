@@ -1,0 +1,71 @@
+From 792c834cac8f8c0943355d9299fb9abf398bc5b3 Mon Sep 17 00:00:00 2001
+From: SupeChicken666 <me@supechicken666.dev>
+Date: Sun, 18 Jan 2026 16:13:28 +0000
+Subject: [PATCH] Replace CLOCK_REALTIME_ALARM with CLOCK_REALTIME
+
+Waydroid should not interrupt the host from sleeping
+
+Change-Id: Ifc4bdecd87439203830ce9bb34a4fd208c014d3e
+Signed-off-by: SupeChicken666 <me@supechicken666.dev>
+---
+ system/gd/os/linux_generic/alarm.cc           | 2 +-
+ system/gd/os/linux_generic/repeating_alarm.cc | 2 +-
+ system/gd/rust/common/src/time.rs             | 2 +-
+ system/osi/src/alarm.cc                       | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/system/gd/os/linux_generic/alarm.cc b/system/gd/os/linux_generic/alarm.cc
+index dde5e21..25a7aa0 100644
+--- a/system/gd/os/linux_generic/alarm.cc
++++ b/system/gd/os/linux_generic/alarm.cc
+@@ -27,7 +27,7 @@
+ #include "os/linux_generic/linux.h"
+ #include "os/utils.h"
+ 
+-#ifdef __ANDROID__
++#if 0
+ #define ALARM_CLOCK CLOCK_BOOTTIME_ALARM
+ #else
+ #define ALARM_CLOCK CLOCK_BOOTTIME
+diff --git a/system/gd/os/linux_generic/repeating_alarm.cc b/system/gd/os/linux_generic/repeating_alarm.cc
+index 2054222..eb12b8d 100644
+--- a/system/gd/os/linux_generic/repeating_alarm.cc
++++ b/system/gd/os/linux_generic/repeating_alarm.cc
+@@ -26,7 +26,7 @@
+ #include "os/linux_generic/linux.h"
+ #include "os/utils.h"
+ 
+-#ifdef __ANDROID__
++#if 0
+ #define ALARM_CLOCK CLOCK_BOOTTIME_ALARM
+ #else
+ #define ALARM_CLOCK CLOCK_BOOTTIME
+diff --git a/system/gd/rust/common/src/time.rs b/system/gd/rust/common/src/time.rs
+index 0fd2226..99d01a0 100644
+--- a/system/gd/rust/common/src/time.rs
++++ b/system/gd/rust/common/src/time.rs
+@@ -100,7 +100,7 @@ impl Interval {
+ }
+ 
+ fn get_clock() -> ClockId {
+-    if cfg!(target_os = "android") {
++    if false {
+         ClockId::CLOCK_BOOTTIME_ALARM
+     } else {
+         ClockId::CLOCK_BOOTTIME
+diff --git a/system/osi/src/alarm.cc b/system/osi/src/alarm.cc
+index c1a1b6d..748400e 100644
+--- a/system/osi/src/alarm.cc
++++ b/system/osi/src/alarm.cc
+@@ -680,7 +680,7 @@ static bool timer_create_internal(const clockid_t clock_id, timer_t* timer) {
+   sigevent.sigev_notify = SIGEV_THREAD;
+   sigevent.sigev_notify_function = (void (*)(union sigval))timer_callback;
+   sigevent.sigev_notify_attributes = &thread_attr;
+-  if (timer_create(clock_id, &sigevent, timer) == -1) {
++  if (timer_create(clock_id == CLOCK_BOOTTIME_ALARM ? CLOCK_BOOTTIME : clock_id, &sigevent, timer) == -1) {
+     log::error("unable to create timer with clock {}: {}", clock_id, strerror(errno));
+     if (clock_id == CLOCK_BOOTTIME_ALARM) {
+       log::error(
+-- 
+2.52.0
+

@@ -1,0 +1,162 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Asriel Dreemurr <asriel.danctnix@gmail.com>
+Date: Fri, 18 Jul 2025 12:41:47 +0000
+Subject: [PATCH 01/11] installd: run without SELinux
+
+Change-Id: I85981dcdec8030a20309c79cfd2628fb30d53197
+---
+ cmds/installd/Android.bp                |  1 +
+ cmds/installd/InstalldNativeService.cpp | 35 ++++++++++++++++---------
+ cmds/installd/dexopt.cpp                |  7 ++---
+ cmds/installd/otapreopt_chroot.cpp      |  5 ++--
+ 4 files changed, 30 insertions(+), 18 deletions(-)
+
+diff --git a/cmds/installd/Android.bp b/cmds/installd/Android.bp
+index 334bae44e3..c4719e1b99 100644
+--- a/cmds/installd/Android.bp
++++ b/cmds/installd/Android.bp
+@@ -18,6 +18,7 @@ cc_defaults {
+         "-Wunreachable-code",
+         "-Wunreachable-code-break",
+         "-Wunreachable-code-return",
++        "-Wno-unused-function",
+     ],
+     srcs: [
+         "CacheItem.cpp",
+diff --git a/cmds/installd/InstalldNativeService.cpp b/cmds/installd/InstalldNativeService.cpp
+index 4486bd6d3e..1586c24672 100644
+--- a/cmds/installd/InstalldNativeService.cpp
++++ b/cmds/installd/InstalldNativeService.cpp
+@@ -519,9 +519,14 @@ private:
+  * if the label of that top-level file actually changed.  This can save us
+  * significant time by avoiding no-op traversals of large filesystem trees.
+  */
+-static int restorecon_app_data_lazy(const std::string& path, const std::string& seInfo, uid_t uid,
+-        bool existing) {
+-    ScopedTrace tracer("restorecon-lazy");
++static int restorecon_app_data_lazy(const std::string& /*path*/, const std::string& /*seInfo*/, uid_t /*uid*/,
++        bool /*existing*/) {
++    int res = 0;
++
++    // Disabled for Waydroid
++    return res;
++
++    /*ScopedTrace tracer("restorecon-lazy");
+     if (!existing) {
+         ScopedTrace tracer("new-path");
+         if (selinux_android_restorecon_pkgdir(path.c_str(), seInfo.c_str(), uid,
+@@ -585,7 +590,7 @@ static int restorecon_app_data_lazy(const std::string& path, const std::string&
+         }
+     }
+ 
+-    return 0;
++    return 0;*/
+ }
+ static bool internal_storage_has_project_id() {
+     // The following path is populated in setFirstBoot, so if this file is present
+@@ -1889,10 +1894,11 @@ binder::Status InstalldNativeService::moveCompleteApp(const std::optional<std::s
+             goto fail;
+         }
+ 
+-        if (selinux_android_restorecon(to_app_package_path.c_str(), SELINUX_ANDROID_RESTORECON_RECURSE) != 0) {
++        // Disabled for Waydroid
++        /*if (selinux_android_restorecon(to_app_package_path.c_str(), SELINUX_ANDROID_RESTORECON_RECURSE) != 0) {
+             res = error("Failed to restorecon " + to_app_package_path);
+             goto fail;
+-        }
++        }*/
+     }
+ 
+     // Copy private data for all known users
+@@ -3339,10 +3345,11 @@ binder::Status InstalldNativeService::linkNativeLibraryDirectory(
+         return error("Failed to stat " + _pkgdir);
+     }
+ 
+-    char *con = nullptr;
++    // Disabled for Waydroid
++    /*char *con = nullptr;
+     if (::lgetfilecon(pkgdir, &con) < 0) {
+         return error("Failed to lgetfilecon " + _pkgdir);
+-    }
++    }*/
+ 
+     if (chown(pkgdir, AID_INSTALL, AID_INSTALL) < 0) {
+         res = error("Failed to chown " + _pkgdir);
+@@ -3378,13 +3385,14 @@ binder::Status InstalldNativeService::linkNativeLibraryDirectory(
+         goto out;
+     }
+ 
+-    if (lsetfilecon(libsymlink, con) < 0) {
++    // Disabled for Waydroid
++    /*if (lsetfilecon(libsymlink, con) < 0) {
+         res = error("Failed to lsetfilecon " + _libsymlink);
+         goto out;
+-    }
++    }*/
+ 
+ out:
+-    free(con);
++    //free(con);
+     if (chmod(pkgdir, s.st_mode) < 0) {
+         auto msg = "Failed to cleanup chmod " + _pkgdir;
+         if (res.isOk()) {
+@@ -3511,9 +3519,10 @@ binder::Status InstalldNativeService::createOatDir(const std::string& packageNam
+     if (fs_prepare_dir(oat_dir, S_IRWXU | S_IRWXG | S_IXOTH, AID_SYSTEM, AID_INSTALL)) {
+         return error("Failed to prepare " + oatDir);
+     }
+-    if (selinux_android_restorecon(oat_dir, 0)) {
++    // Disabled for Waydroid
++    /*if (selinux_android_restorecon(oat_dir, 0)) {
+         return error("Failed to restorecon " + oatDir);
+-    }
++    }*/
+     snprintf(oat_instr_dir, PKG_PATH_MAX, "%s/%s", oat_dir, instruction_set);
+     if (fs_prepare_dir(oat_instr_dir, S_IRWXU | S_IRWXG | S_IXOTH, AID_SYSTEM, AID_INSTALL)) {
+         return error(StringPrintf("Failed to prepare %s", oat_instr_dir));
+diff --git a/cmds/installd/dexopt.cpp b/cmds/installd/dexopt.cpp
+index 1693ed5297..a3396f1c23 100644
+--- a/cmds/installd/dexopt.cpp
++++ b/cmds/installd/dexopt.cpp
+@@ -1786,7 +1786,7 @@ static std::string format_dexopt_error(int status, const char* dex_path) {
+ 
+ int dexopt(const char* dex_path, uid_t uid, const char* pkgname, const char* instruction_set,
+         int dexopt_needed, const char* oat_dir, int dexopt_flags, const char* compiler_filter,
+-        const char* volume_uuid, const char* class_loader_context, const char* se_info,
++        const char* volume_uuid, const char* class_loader_context, const char* /*se_info*/,
+         bool downgrade, int target_sdk_version, const char* profile_name,
+         const char* dex_metadata_path, const char* compilation_reason, std::string* error_msg,
+         /* out */ bool* completed) {
+@@ -1903,12 +1903,13 @@ int dexopt(const char* dex_path, uid_t uid, const char* pkgname, const char* ins
+     // Note that for primary apk the oat files are created before, in a separate installd
+     // call which also does the restorecon. TODO(calin): unify the paths.
+     if (is_secondary_dex) {
+-        if (selinux_android_restorecon_pkgdir(oat_dir, se_info, uid,
++        // Disabled for Waydroid
++        /*if (selinux_android_restorecon_pkgdir(oat_dir, se_info, uid,
+                 SELINUX_ANDROID_RESTORECON_RECURSE)) {
+             *error_msg = std::string("Failed to restorecon ").append(oat_dir);
+             LOG(ERROR) << *error_msg;
+             return -1;
+-        }
++        }*/
+     }
+ 
+     // Create a swap file if necessary.
+diff --git a/cmds/installd/otapreopt_chroot.cpp b/cmds/installd/otapreopt_chroot.cpp
+index c86adef118..473041b9a3 100644
+--- a/cmds/installd/otapreopt_chroot.cpp
++++ b/cmds/installd/otapreopt_chroot.cpp
+@@ -253,10 +253,11 @@ static int otapreopt_chroot(const int argc, char **arg) {
+         PLOG(ERROR) << "Failed to mount tmpfs in " << kPostinstallApexDir;
+         exit(209);
+     }
+-    if (selinux_android_restorecon(kPostinstallApexDir, 0) < 0) {
++    // Disabled for Waydroid
++    /*if (selinux_android_restorecon(kPostinstallApexDir, 0) < 0) {
+         PLOG(ERROR) << "Failed to restorecon " << kPostinstallApexDir;
+         exit(214);
+-    }
++    }*/
+     if (chmod(kPostinstallApexDir, 0755) != 0) {
+         PLOG(ERROR) << "Failed to chmod " << kPostinstallApexDir << " to 0755";
+         exit(210);

@@ -34,26 +34,27 @@ from xml.etree import ElementTree as ET
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 MANIFEST = os.path.join(ROOT, "manifest", "10-waydroid-projects.xml")
-FORKS_DIR = os.path.join(ROOT, "base-patches-36", "10-lineage-forks")
+FORKS_DIR = os.path.join(ROOT, "base-patches-35", "10-lineage-forks")
 
 API = "https://api.github.com"
 UA = "waydroid-lineage-patches-tracker"
 
 # LineageOS repo (GitHub) whose fork we patch, -> the WayDroid-ATV fork + branch.
 # Key is the in-tree project path.
+#
+# Android 15 forks only these six. system/vold and hardware/interfaces are not
+# forks on lineage-22.2; upstream ships them as verbatim base-patches-35.
 PATCHED = {
-    "frameworks/base":       ("LineageOS/android_frameworks_base",       "WayDroid-ATV/android_frameworks_base",       "lineage-23.2"),
-    "frameworks/av":         ("LineageOS/android_frameworks_av",         "WayDroid-ATV/android_frameworks_av",         "lineage-23.2"),
-    "frameworks/native":     ("LineageOS/android_frameworks_native",     "WayDroid-ATV/android_frameworks_native",     "lineage-23.2"),
-    "system/core":           ("LineageOS/android_system_core",           "WayDroid-ATV/android_system_core",           "lineage-23.2"),
-    "system/vold":           ("LineageOS/android_system_vold",           "WayDroid-ATV/android_system_vold",           "lineage-23.2"),
-    "hardware/interfaces":   ("LineageOS/android_hardware_interfaces",   "WayDroid-ATV/android_hardware_interfaces",   "lineage-23.2"),
-    "lineage-sdk":           ("LineageOS/android_lineage-sdk",           "WayDroid-ATV/android_lineage-sdk",           "lineage-23.2"),
-    "packages/apps/TvSettings": ("LineageOS/android_packages_apps_TvSettings", "WayDroid-ATV/android_packages_apps_TvSettings", "lineage-23.2"),
+    "frameworks/base":       ("LineageOS/android_frameworks_base",       "WayDroid-ATV/android_frameworks_base",       "lineage-22.2"),
+    "frameworks/av":         ("LineageOS/android_frameworks_av",         "WayDroid-ATV/android_frameworks_av",         "lineage-22.2"),
+    "frameworks/native":     ("LineageOS/android_frameworks_native",     "WayDroid-ATV/android_frameworks_native",     "lineage-22.2"),
+    "system/core":           ("LineageOS/android_system_core",           "WayDroid-ATV/android_system_core",           "lineage-22.2"),
+    "lineage-sdk":           ("LineageOS/android_lineage-sdk",           "WayDroid-ATV/android_lineage-sdk",           "lineage-22.2"),
+    "packages/apps/TvSettings": ("LineageOS/android_packages_apps_TvSettings", "WayDroid-ATV/android_packages_apps_TvSettings", "lineage-22.2"),
 }
 
 # Branch used to compare (LineageOS release we track).
-LOS_BRANCH = "lineage-23.2"
+LOS_BRANCH = "lineage-22.2"
 
 
 def _get(url: str):
@@ -172,7 +173,7 @@ def main() -> int:
         print("# rebuild the stale layers:")
         for r in stale:
             print(f"GEN_WORKDIR=$PWD/_scratch bash tools/gen-fork-patches.sh "
-                  f"<LineageOS-root> base-patches-36/10-lineage-forks {r['project']}")
+                  f"<LineageOS-root> base-patches-35/10-lineage-forks {r['project']}")
 
     print()
     print(f"Synced (never patched, plain repo projects): {len(manifest_projects())} entries in "

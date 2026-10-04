@@ -7,3 +7,6 @@
 # scratch
 *.orig
 *.rej
+
+# gen-fork-patches.sh scratch
+_scratch/

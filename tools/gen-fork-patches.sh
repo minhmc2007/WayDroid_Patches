@@ -32,14 +32,17 @@ WORK="${GEN_WORKDIR:-$(mktemp -d)}"
 mkdir -p "$WORK"
 
 # project-path|fork-repo|fork-ref|expected-ahead
+#
+# Android 15 (lineage-22.2) forks only these six. system/vold and
+# hardware/interfaces are NOT forks here: upstream ships them as verbatim
+# base-patches-35, so they belong to layer 20 instead.
 PROJECTS=(
-  "frameworks/base|WayDroid-ATV/android_frameworks_base|lineage-23.2|22"
-  "frameworks/av|WayDroid-ATV/android_frameworks_av|lineage-23.2|29"
-  "frameworks/native|WayDroid-ATV/android_frameworks_native|lineage-23.2|26"
-  "system/core|WayDroid-ATV/android_system_core|lineage-23.2|33"
-  "system/vold|WayDroid-ATV/android_system_vold|lineage-23.2|8"
-  "hardware/interfaces|WayDroid-ATV/android_hardware_interfaces|lineage-23.2|10"
-  "lineage-sdk|WayDroid-ATV/android_lineage-sdk|lineage-23.2|12"
+  "frameworks/base|WayDroid-ATV/android_frameworks_base|lineage-22.2|?"
+  "frameworks/av|WayDroid-ATV/android_frameworks_av|lineage-22.2|?"
+  "frameworks/native|WayDroid-ATV/android_frameworks_native|lineage-22.2|?"
+  "system/core|WayDroid-ATV/android_system_core|lineage-22.2|?"
+  "lineage-sdk|WayDroid-ATV/android_lineage-sdk|lineage-22.2|?"
+  "packages/apps/TvSettings|WayDroid-ATV/android_packages_apps_TvSettings|lineage-22.2|?"
 )
 
 FETCH_DEPTH="${GEN_FETCH_DEPTH:-120}"

@@ -1,0 +1,33 @@
+From cbc2a9718d35bfe9d5fb70615910332a5c4132b7 Mon Sep 17 00:00:00 2001
+From: Erfan Abdi <erfangplus@gmail.com>
+Date: Mon, 18 Oct 2021 13:20:28 +0800
+Subject: [PATCH 5/8] vold: Disable fstab check
+
+Co-authored-by: SupeChicken666 <me@supechicken666.dev>
+Change-Id: I82e2fccae7865858d20dda6882ad7e52225e5013
+---
+ main.cpp | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/main.cpp b/main.cpp
+index b1b42fd..b879819 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -231,11 +231,13 @@ static void coldboot(const char* path) {
+ static int process_config(VolumeManager* vm, VoldConfigs* configs) {
+     ATRACE_NAME("process_config");
+ 
+-    if (!ReadDefaultFstab(&fstab_default)) {
++    if (!ReadFstabFromFile("/proc/mounts", &fstab_default)) {
+         PLOG(ERROR) << "Failed to open default fstab";
+         return -1;
+     }
+ 
++    if (1) return 0;
++
+     /* Loop through entries looking for ones that vold manages */
+     configs->has_adoptable = false;
+     configs->has_quota = false;
+-- 
+2.52.0
+
