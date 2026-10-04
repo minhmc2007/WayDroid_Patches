@@ -15,10 +15,14 @@ actual error.
 | `external/mesa/0001` | define `mesa_gfxstream_aemu` | the fork's A15+ stub declares only the headers module |
 | `external/mesa/0002` | `ld.lld` by absolute path | the meson rule's PATH has no AOSP clang directory |
 | `external/mesa/0003` | `LIBVA_DIR` → `hardware/intel/common/libva` | the swap removes `external/libva`, so the version scrape is empty |
+| `prebuilts/mesa-tools/0001` | symlink `root/lib64/libxml2.so.2` | the bundled libLLVM wants the libxml2 2.9 soname |
 
-All five are inconsistencies in upstream's `manifests-35` rather than defects we
-introduced. On Android 16 none of them showed up, which is why upstream never
-fixed them.
+The mesa-tools one is ported verbatim from
+`base-patches-36/15-ours/prebuilts/mesa-tools` on `lineage-23.2`.
+
+All of them are inconsistencies in upstream's `manifests-35` rather than defects
+we introduced. On Android 16 none showed up, which is why upstream never fixed
+them.
 
 ## The gapps one
 
@@ -129,7 +133,15 @@ Do not try to satisfy this with a host `libva`. `mesa3d_cross.mk:274` pins
 `PKG_CONFIG_LIBDIR` to the directory it generates, so pkg-config cannot see host
 libraries.
 
-`0001` exists because the fork's root `Android.bp` is a stub, commented
+The mesa-tools symlink is an alias, not the library LLVM 20 was built against.
+Any mesa path needing a real ABI libxml2 2.9 symbol would still fail, and the
+real fix would be to bundle `libxml2.so.2` in `root/lib64`. The wrapper only
+SHA-256 verifies files that have a `.sha256` beside them, and this one has none,
+so it is neither verified nor clobbered. Verified here by loading `mesa_clc`
+through the bundled loader: it reaches its argument parser, warning
+`no version information available`.
+
+`external/mesa/0001` exists because the fork's root `Android.bp` is a stub, commented
 *"Stub for satisfying dependency checks on A15+"*. It declares
 `mesa_gfxstream_aemu_headers` but not the library, and Android 15's
 `hardware/google/gfxstream/guest/magma` needs both. `src/gfxstream/aemu` is

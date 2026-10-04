@@ -1,0 +1,35 @@
+From 8b02211a8fe39cf1490a78bfe5c71b08c39337d3 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Sun, 4 Oct 2026 21:40:11 +0700
+Subject: [PATCH] mesa-tools: link libxml2.so.2 for the bundled libLLVM
+
+root/bin/mesa_clc: error while loading shared libraries:
+libxml2.so.2: cannot open shared object file
+
+The bundled root/lib64/libLLVM.so.20.1 is linked against libxml2.so.2, the
+soname of libxml2 2.9. This prebuilt ships no libxml2 in root/lib64, and the
+wrapper puts only that directory on LD_LIBRARY_PATH, so it has to resolve from
+the host. The host has libxml2 2.15, whose soname is libxml2.so.16, so nothing
+resolves.
+
+Symlink the newer soname to the old name. The wrapper only SHA-256 verifies
+files that have a .sha256 beside them and this has none, so the symlink is
+neither verified nor clobbered.
+
+This is a soname alias, not the library LLVM 20 was built against. Any mesa path
+needing an ABI libxml2 2.9 symbol would fail, and the real fix would be to
+bundle libxml2.so.2 here. mesa_clc loads and runs with it; it warns "no version
+information available" and reaches its argument parser.
+---
+ root/lib64/libxml2.so.2 | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 120000 root/lib64/libxml2.so.2
+
+diff --git a/root/lib64/libxml2.so.2 b/root/lib64/libxml2.so.2
+new file mode 120000
+index 0000000..8dbab37
+--- /dev/null
++++ b/root/lib64/libxml2.so.2
+@@ -0,0 +1 @@
++/usr/lib/libxml2.so.16
+\ No newline at end of file
