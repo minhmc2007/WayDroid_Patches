@@ -2,11 +2,13 @@
 
 Android 15 QPR2, SDK 35. Branch `lineage-22.2`. Phone build, not Android TV.
 
-Upstream [WayDroid-ATV](https://github.com/WayDroid-ATV) `remove-project`s ~15
+Upstream [WayDroid-ATV](https://github.com/WayDroid-ATV) `remove-project`s 11
 LineageOS projects and re-adds its own forks at the same paths, so every later
 LineageOS merge is a manual fork rebase. This repo keeps the LineageOS
-checkout and layers patches on top instead. Nothing LineageOS maintains is ever
-removed or re-pointed.
+checkout and layers patches on top instead. Nothing LineageOS maintains is
+removed or re-pointed, with one deliberate exception: `external/mesa3d`, which
+has to give way to the Waydroid mesa fork or the GL stack does not exist. See
+**mesa** under Deviations.
 
 ## Host prerequisites
 
@@ -91,9 +93,10 @@ LineageOS commits behind, and those stay untouched. Six projects:
 `hardware/interfaces` were forks too; on 22.2 upstream ships them verbatim
 instead, so they moved to layer 20. GPL-3.0.
 
-`15-ours` (2) — hand-written fixes, one per build failure so far:
-`vendor/gapps/0001` and `external/libsndfile/0001`. Apache-2.0.
-`docs/build-fixes.md` explains each and quotes the error it came from.
+`15-ours` (6) — hand-written fixes, one per build failure: `vendor/gapps`,
+`external/libsndfile`, three in `external/mesa`, `prebuilts/mesa-tools`.
+Apache-2.0. `docs/build-fixes.md` explains each and quotes the error it came
+from.
 
 `20-upstream` (53) — upstream's `base-patches-35` plus the `roms-patches`
 conflict fallbacks and three `hardware/intel/common` patches upstream authored
@@ -128,14 +131,16 @@ tree. It is re-emitted with the `Android.bp` hunk dropped and the missing
 `cinnamonbun` is the Android 15 platform branch of `android_vendor_gapps`; there
 is no `vendor/gapps_tv` on it, this is a phone build.
 
-**mesa is not swapped.** Upstream adds the fork at `external/mesa` and never
-removes LineageOS' `external/mesa3d`, so both land in the module list and soong
-dies with `module "mesa_src_headers" already defined`. Swapping in place fails
-differently: `hardware/google/gfxstream/guest/magma` on Android 15 depends on
-`mesa_gfxstream_aemu`, which no branch of the fork provides. `lineage-18.1` and
-all fourteen `lineage-18.1-mesa-*` branches were checked. So `mesa3d` stays
-unpatched. On Android 16 the swap works because Android 16's gfxstream does not
-need that module.
+**mesa is swapped, and it is the one deviation from "never re-point
+LineageOS".** Upstream adds the fork at `external/mesa` and never removes
+LineageOS' `external/mesa3d`, so both land in the module list and soong dies with
+`module "mesa_src_headers" already defined` plus eight more. The fork has to be
+the survivor: its `android/Android.mk` is the only definition of `libgbm_mesa`,
+`libEGL_mesa` and `libgallium_dri` in the tree, all three of which
+`device/waydroid/waydroid/device.mk` puts in `PRODUCT_PACKAGES`, and LineageOS'
+mesa3d has no `src/gbm/Android.bp` at all. So `external/mesa3d` is removed and
+the fork takes its place. Sixth `remove-project`, recorded inline in the
+fragment. Android 16's manifest does the same thing.
 
 **GApps `apps` property.** `prebuilt_apex` gained `apps` after Android 15, and
 `cinnamonbun` head `74fba8f` uses it. That is the only commit touching
@@ -148,11 +153,12 @@ bug these swaps invite.
 **AOSP swaps.** `repo` cannot point an existing project at a different upstream:
 `<project path="X">` is `duplicate path`, and `<extend-project>` keeps the
 original project *name*. So swapping is only expressible as
-`remove-project` + `project`. These five are AOSP-remote display/media
-trees LineageOS does not maintain, and the build does not link without them:
-ffmpeg's 32-bit variant needs `libva` for `android-x86`, and LineageOS's
-`external/libva` only enables `x86_64`. They are the only `remove-project` in
-this repo. `--no-aosp-swaps` for the strict pure-add manifest.
+`remove-project` + `project`. These six: five are AOSP-remote display/media trees
+LineageOS does not maintain, and the build does not link without them, since
+ffmpeg's 32-bit variant needs `libva` for `android-x86` and LineageOS's
+`external/libva` only enables `x86_64`. The sixth is `mesa3d`, described above,
+which does drop a LineageOS-maintained project. `--no-aosp-swaps` for the
+strict pure-add manifest.
 
 ## Tools
 

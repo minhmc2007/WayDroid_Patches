@@ -40,8 +40,8 @@ git format-patch "$(git merge-base LOS_TIP FORK_TIP)"..FORK_TIP
 
 Diffing from the **merge-base**, not the LineageOS tip, is what keeps
 LineageOS commits out of the series. That is also what handles a diverged fork:
-`lineage-sdk` is 2 LineageOS commits behind its fork, and diffing from the
-merge-base yields the 12 Waydroid commits while those 2 stay untouched in the
+`lineage-sdk` is 7 LineageOS commits behind its fork, and diffing from the
+merge-base yields the 8 Waydroid commits while those 7 stay untouched in the
 checkout.
 
 If the merge-base falls outside `GEN_FETCH_DEPTH` (default 120), it says so and
@@ -70,7 +70,7 @@ The `action` column is the useful part:
 |---|---|
 | `ok` | fork is cleanly ahead, patch count matches |
 | `ok (diverged, N LOS commit(s) not in fork)` | fine; `gen-fork-patches.sh` diffs from the merge-base |
-| `nothing to do (fork has no commits we lack)` | e.g. `TvSettings`, 4 commits behind |
+| `nothing to do (fork has no commits we lack)` | e.g. `TvSettings`, 2 commits behind |
 | `REGENERATE` | fork moved, regenerate that project |
 
 ## `check-dup-modules.py`
@@ -89,8 +89,8 @@ python3 tools/check-dup-modules.py <src> --ours manifest/10-waydroid-projects.xm
 Soong fails with `module "X" already defined` when two projects declare the same
 module name and neither uses a `soong_namespace`. Checking the manifest *names*
 does not catch it, because the two projects have different manifest names
-(`intel/gmmlib` vs `platform/external/gmmlib`). This compares the module names
-declared in `Android.bp` and `Android.mk` instead.
+(`intel/gmmlib` vs `platform/external/gmmlib`, and likewise for mesa). This
+compares the module names declared in `Android.bp` and `Android.mk` instead.
 
 With `--ours` it only considers modules declared by your manifest fragments,
 which is both much faster and the check you want after editing one. Modules in

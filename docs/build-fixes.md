@@ -76,26 +76,48 @@ nearest surviving branch, recorded inline in the manifest fragments:
 `hardware/waydroid` gets `lineage-21` rather than `lineage-23.0` because the
 latter adds a `window/1.3` HAL that Android 15 has no consumer for.
 
-## mesa is deliberately not swapped
+## mesa is a swap, and it is the load-bearing one
 
 Upstream 22.2 adds the Waydroid mesa fork at `external/mesa` and never removes
-LineageOS' `external/mesa3d`, so both end up in the module list and soong dies
-with `module "mesa_src_headers" already defined` and eight more. Swapping it in
-place does not work either:
+LineageOS' `external/mesa3d`, so both reach the module list and soong dies with
+`module "mesa_src_headers" already defined` plus eight more. Adding a
+`remove-project` for `platform/external/mesa3d` fixes that, and the fork has to
+be the one that survives, because it is the only provider of the GL stack:
 
-```
-error: hardware/google/gfxstream/guest/magma/Android.bp:22:1: "libmagma_android"
-depends on undefined module "mesa_gfxstream_aemu".
-```
+* `external/mesa/android/Android.mk` is the only definition of `libgbm_mesa`,
+  `libEGL_mesa` and `libgallium_dri` in the entire tree, and
+  `device/waydroid/waydroid/device.mk` puts all three in `PRODUCT_PACKAGES`.
+* LineageOS' own mesa3d has no `src/gbm/Android.bp` at all. It builds vulkan,
+  gfxstream and util, not GL.
+* That `Android.mk` is gated on `BOARD_MESA3D_USES_MESON_BUILD`, which
+  `device/waydroid/waydroid/BoardConfig.mk` already sets.
 
-No branch of `WayDroid-ATV/android_external_mesa3d` provides it. `lineage-18.1`
-and all fourteen `lineage-18.1-mesa-*` branches were checked; none has
-`src/gfxstream/aemu`. Only LineageOS' copy does. So mesa3d is left unpatched,
-which also matches the rule that a LineageOS-maintained project is never
-re-pointed. The Android 16 manifest swaps it because Android 16's gfxstream does
-not need `mesa_gfxstream_aemu` and Android 15's does.
+So this is the sixth `remove-project`, and unlike the other five it drops a
+LineageOS-maintained project. That is a deliberate deviation from "never
+re-point LineageOS", recorded inline in `manifest/20-aosp-swaps.xml`. Reverting
+it costs the GL stack outright.
+
+minigbm's `gralloc` `include_dirs` point at `external/mesa`, which is where
+upstream puts the fork and where the fork's svga headers are. Left alone, they
+would have needed a patch; swapping mesa at the upstream path means they did not.
 
 ## The three mesa ones
+
+`0001` exists because the fork's root `Android.bp` is a stub, commented
+*"Stub for satisfying dependency checks on A15+"*. It declares
+`mesa_gfxstream_aemu_headers` but not the library, and Android 15's
+`hardware/google/gfxstream/guest/magma` needs both:
+
+```
+error: hardware/google/gfxstream/guest/magma/Android.bp:22:1:
+"libmagma_android" depends on undefined module "mesa_gfxstream_aemu".
+```
+
+`src/gfxstream/aemu` is present and untouched, so the module is defined against
+sources already in the tree rather than pulled from elsewhere. The stub headers
+module also exported no include dir, so consumers including `Stream.h` had no
+include path either. Android 16's gfxstream does not need this module, which is
+why the stub was good enough there.
 
 `0002` is ported from `base-patches-36/15-ours/external/mesa3d` on
 `lineage-23.2`, regenerated against `external/mesa` so the blob hashes match
@@ -141,13 +163,30 @@ so it is neither verified nor clobbered. Verified here by loading `mesa_clc`
 through the bundled loader: it reaches its argument parser, warning
 `no version information available`.
 
-`external/mesa/0001` exists because the fork's root `Android.bp` is a stub, commented
-*"Stub for satisfying dependency checks on A15+"*. It declares
-`mesa_gfxstream_aemu_headers` but not the library, and Android 15's
-`hardware/google/gfxstream/guest/magma` needs both. `src/gfxstream/aemu` is
-present and untouched, so the module is defined against sources already in the
-tree. The stub headers module also exported no include dir, so consumers
-including `Stream.h` had no include path either.
+## Host prerequisites
+
+Two packages beyond the AOSP list, both from the distro:
+
+```shell
+sudo pacman -S rust-bindgen
+```
+
+The mesa fork runs `find_program('bindgen')` at configure time and dies with
+*Mesa requires bindgen 0.71.1 or newer* if it is missing. Arch has 0.73.2.
+`cargo install bindgen-cli` compiles from source for minutes when the distro
+already ships a version past the floor. Do not confuse it with `cbindgen`, which
+goes the other direction and is a separate requirement of nouveau's `nil`
+driver.
+
+`rust-bindgen` is needed only because our manifest adds
+`external/llvm-project`. With LLVM present mesa takes its Rust path; drop that
+project and the requirement goes away, but so do `llvmpipe` and `iris`, which
+`BOARD_MESA3D_GALLIUM_DRIVERS` asks for. On 23.2 that project was absent, the
+LLVM stub disabled the path, and the requirement never fired.
+
+Do not install a host `libva`. `mesa3d_cross.mk` pins `PKG_CONFIG_LIBDIR` to the
+directory it generates, so pkg-config cannot see host libraries, which is the
+point. The libva problem that does need fixing is `external/mesa/0003` above.
 
 ## Regenerating
 
