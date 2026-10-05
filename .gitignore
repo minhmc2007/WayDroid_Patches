@@ -7,3 +7,6 @@
 # scratch
 *.orig
 *.rej
+
+# scratch worktrees and logs
+_scratch/
