@@ -15,10 +15,10 @@
 
   <project path="device/waydroid/waydroid" name="WayDroid-ATV/android_device_waydroid_waydroid" remote="ghub" clone-depth="1" revision="refs/heads/lineage-22.2" />
 
-  <!-- lineage-22.2 was deleted upstream; lineage-21 is the nearest branch that
-       predates Android 16. lineage-23.0 adds a window/1.3 HAL that A15 has no
-       consumer for. -->
-  <project path="hardware/waydroid" name="WayDroid-ATV/android_hardware_waydroid" remote="ghub" clone-depth="1" revision="refs/heads/lineage-21" />
+  <!-- lineage-22.2 deleted upstream. lineage-21 and lineage-23.0 drop every HAL
+     except audio/hwcomposer/interfaces, so gatekeeper, memtrack and power never
+     register and the boot log crash-loops instead. -->
+  <project path="hardware/waydroid" name="WayDroid-ATV/android_hardware_waydroid" remote="ghub" clone-depth="1" revision="refs/heads/fix_build_error" />
   <project path="vendor/extra" name="WayDroid-ATV/android_vendor_waydroid" remote="ghub" clone-depth="1" revision="refs/heads/lineage-22.2" />
   <project path="packages/apps/WaydroidUpdater" name="WayDroid/android_packages_apps_WaydroidUpdater" remote="ghub" clone-depth="1" revision="refs/heads/lineage-20" />
 
