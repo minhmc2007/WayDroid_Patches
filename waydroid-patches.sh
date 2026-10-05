@@ -324,7 +324,7 @@ cmd_manifest() {
   fi
 
   if [[ $dosync -eq 0 ]]; then
-    echo "next: (cd $src && repo sync -c -j$jobs)"
+    echo "next: (cd $src && repo sync -c -j$jobs --force-sync)"
     return 0
   fi
 
@@ -351,11 +351,11 @@ cmd_manifest() {
   fi
 
   echo
-  echo "syncing the rest (repo sync -c -j$jobs), this can take a while..."
-  if ! ( cd "$src" && repo sync -c -j"$jobs" ); then
+  echo "syncing the rest (repo sync -c -j$jobs --force-sync), this can take a while..."
+  if ! ( cd "$src" && repo sync -c -j"$jobs" --force-sync ); then
     echo
     echo "repo sync failed. Fix that, then run:"
-    echo "  (cd $src && repo sync -c -j$jobs)"
+    echo "  (cd $src && repo sync -c -j$jobs --force-sync)"
     return 1
   fi
 
@@ -424,7 +424,7 @@ cmd_apply() {
       echo
       echo "error: ${#absent[@]} project(s) from our manifest are missing and --no-sync was given:"
       printf '  %s\n' "${absent[@]}"
-      echo "run: (cd $src && repo sync -c -j$jobs)"
+      echo "run: (cd $src && repo sync -c -j$jobs --force-sync)"
       return 1
     fi
     if [[ $dry -eq 1 ]]; then
@@ -436,7 +436,7 @@ cmd_apply() {
       echo "${#absent[@]} project(s) from our manifest are not in the tree, syncing first."
       echo "this downloads them, so it can take a while."
       echo
-      if ! ( cd "$src" && repo sync -c -j"$jobs" ); then
+      if ! ( cd "$src" && repo sync -c -j"$jobs" --force-sync ); then
         echo
         echo "repo sync failed. Fix that, then re-run: $0 apply $src"
         return 1
