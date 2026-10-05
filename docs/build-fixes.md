@@ -17,6 +17,7 @@ actual error.
 | `external/mesa/0003` | `LIBVA_DIR` → `hardware/intel/common/libva` | the swap removes `external/libva`, so the version scrape is empty |
 | `prebuilts/mesa-tools/0001` | symlink `root/lib64/libxml2.so.2` | the bundled libLLVM wants the libxml2 2.9 soname |
 | `hardware/waydroid/0001` | delete `health/` | A15 dropped health@2.0-impl, and nothing references the module |
+| `device/waydroid/waydroid/0001` | stop inheriting GApps | the x86_64 GMS apex declares minSdkVersion 36 |
 
 The mesa-tools one is ported verbatim from
 `base-patches-36/15-ours/prebuilts/mesa-tools` on `lineage-23.2`.

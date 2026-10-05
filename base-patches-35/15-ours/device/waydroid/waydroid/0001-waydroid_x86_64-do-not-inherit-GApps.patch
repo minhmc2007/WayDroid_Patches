@@ -1,0 +1,37 @@
+From 4b30f9d5e993425d5572b4bf0be525dc31189c7d Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Mon, 5 Oct 2026 14:12:49 +0700
+Subject: [PATCH] waydroid_x86_64: do not inherit GApps
+
+java.lang.IllegalStateException: Unable to parse:
+/system/product/apex/com.google.android.gmssystem.prodvic.apex
+Caused by: PackageManagerException: Requires newer sdk version #36
+(current version is #35)
+
+The apex is a prebuilt, so its minSdkVersion is baked in. Parsing it out of
+android_vendor_gapps@cinnamonbun@74fba8f gives 36. That commit is "Reland x86_64
+support" and brought the whole x86_64 tree across from the A16 line, apex
+included; its parent has no x86_64 directory at all.
+
+No reachable gapps revision has an x86_64 apex for API 35. baklava has no apex,
+luk/py_build has arm and arm64 only, and WayDroid-ATV/vendor_gapps, which
+manifests-35 names at vic, is deleted.
+
+Commenting the inherit drops the whole gapps set, not just the apex.
+---
+ waydroid_x86_64/lineage_waydroid_x86_64.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/waydroid_x86_64/lineage_waydroid_x86_64.mk b/waydroid_x86_64/lineage_waydroid_x86_64.mk
+index 706f38f..0d6e3a6 100644
+--- a/waydroid_x86_64/lineage_waydroid_x86_64.mk
++++ b/waydroid_x86_64/lineage_waydroid_x86_64.mk
+@@ -21,7 +21,7 @@ $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
+ $(call inherit-product, $(LOCAL_PATH)/../device.mk)
+ 
+ # Inherit GApps
+-$(call inherit-product, vendor/gapps/x86_64/x86_64-vendor.mk)
++#$(call inherit-product, vendor/gapps/x86_64/x86_64-vendor.mk)
+ 
+ ANDROID_USE_WIDEVINE := true
+ ANDROID_USE_NDK_TRANSLATION := true
