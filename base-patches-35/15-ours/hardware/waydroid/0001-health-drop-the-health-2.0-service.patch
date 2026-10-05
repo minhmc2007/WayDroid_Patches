@@ -1,0 +1,153 @@
+From ab5f3103a9b4338e92cb782f4fc861aa5f497b02 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Mon, 5 Oct 2026 13:20:13 +0700
+Subject: [PATCH] health: drop the health@2.0 service
+
+error: hardware/waydroid/health/Android.bp:16:1:
+"android.hardware.health@2.0-service.waydroid" depends on undefined module
+"android.hardware.health@2.0-impl".
+
+Android 15 dropped health 2.0's default impl and made 2.1 binderized, so
+libhealthservice and health2/service.h are gone. This service cannot build.
+
+Nothing references it. device.mk lists android.hardware.health-service.example
+instead, AOSP's own fake-battery service, which is also what lineage-23.2 uses.
+Soong builds this dead module and gains nothing from it.
+---
+ health/Android.bp                             | 50 ----------------
+ ...id.hardware.health@2.0-service.waydroid.rc |  4 --
+ health/health_service.cpp                     | 57 -------------------
+ 3 files changed, 111 deletions(-)
+ delete mode 100644 health/Android.bp
+ delete mode 100644 health/android.hardware.health@2.0-service.waydroid.rc
+ delete mode 100644 health/health_service.cpp
+
+diff --git a/health/Android.bp b/health/Android.bp
+deleted file mode 100644
+index b5cee78..0000000
+--- a/health/Android.bp
++++ /dev/null
+@@ -1,50 +0,0 @@
+-/*
+- * Copyright (C) 2018 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-cc_binary {
+-    name: "android.hardware.health@2.0-service.waydroid",
+-    init_rc: ["android.hardware.health@2.0-service.waydroid.rc"],
+-    proprietary: true,
+-    relative_install_path: "hw",
+-    srcs: [
+-        "health_service.cpp",
+-    ],
+-
+-    cflags: [
+-        "-Wall",
+-        "-Werror",
+-    ],
+-
+-    static_libs: [
+-        "android.hardware.health@2.0-impl",
+-        "android.hardware.health@1.0-convert",
+-        "libhealthservice",
+-        "libbatterymonitor",
+-    ],
+-
+-    shared_libs: [
+-        "libbase",
+-        "libcutils",
+-        "libhidlbase",
+-        "libutils",
+-        "android.hardware.health@2.0",
+-    ],
+-
+-    header_libs: ["libhealthd_headers"],
+-
+-    overrides: [
+-        "healthd",
+-    ],
+-}
+diff --git a/health/android.hardware.health@2.0-service.waydroid.rc b/health/android.hardware.health@2.0-service.waydroid.rc
+deleted file mode 100644
+index 32768f8..0000000
+--- a/health/android.hardware.health@2.0-service.waydroid.rc
++++ /dev/null
+@@ -1,4 +0,0 @@
+-service vendor.health-hal-2-0 /vendor/bin/hw/android.hardware.health@2.0-service.waydroid
+-    class hal
+-    user system
+-    group system
+diff --git a/health/health_service.cpp b/health/health_service.cpp
+deleted file mode 100644
+index 074582f..0000000
+--- a/health/health_service.cpp
++++ /dev/null
+@@ -1,57 +0,0 @@
+-/*
+- * Copyright (C) 2018 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-#define LOG_TAG "android.hardware.health@2.0-service.waydroid"
+-
+-#include <health2/Health.h>
+-#include <health2/service.h>
+-#include <healthd/healthd.h>
+-
+-#include <android-base/logging.h>
+-
+-using android::hardware::health::V2_0::DiskStats;
+-using android::hardware::health::V2_0::StorageInfo;
+-
+-void healthd_board_init(struct healthd_config* config) {
+-  config->periodic_chores_interval_fast = -1;
+-  config->periodic_chores_interval_slow = -1;
+-}
+-
+-int healthd_board_battery_update(
+-    struct android::BatteryProperties* battery_props) {
+-  battery_props->chargerAcOnline = true;
+-  battery_props->chargerUsbOnline = true;
+-  battery_props->chargerWirelessOnline = false;
+-  battery_props->maxChargingCurrent = 500000;
+-  battery_props->maxChargingVoltage = 5000000;
+-  battery_props->batteryStatus = android::BATTERY_STATUS_CHARGING;
+-  battery_props->batteryHealth = android::BATTERY_HEALTH_GOOD;
+-  battery_props->batteryPresent = true;
+-  battery_props->batteryLevel = 85;
+-  battery_props->batteryVoltage = 3600;
+-  battery_props->batteryTemperature = 350;
+-  battery_props->batteryCurrent = 400000;
+-  battery_props->batteryCycleCount = 32;
+-  battery_props->batteryFullCharge = 4000000;
+-  battery_props->batteryChargeCounter = 1900000;
+-  battery_props->batteryTechnology = "Li-ion";
+-  return 0;
+-}
+-
+-void get_storage_info(std::vector<struct StorageInfo>&) {}
+-
+-void get_disk_stats(std::vector<struct DiskStats>&) {}
+-
+-int main(void) { return health_service_main(); }
