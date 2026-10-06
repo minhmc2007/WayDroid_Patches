@@ -2,7 +2,7 @@
 
 These live in layer `15-ours`, under Apache-2.0, deliberately kept apart from
 the GPL-3.0 fork deltas. They are hand-written patches against projects that
-have drifted past what LineageOS 23.2 provides, or that ship without a
+have drifted past what CrDroid 16 provides, or that ship without a
 LineageOS-side fix.
 
 Each one was made only after a build failed, and each commit message quotes the
@@ -10,7 +10,7 @@ actual error.
 
 | patch | project | why |
 |---|---|---|
-| `external/rust/hbm/0001` | `libash_latest_rust` → `libash_rust` | hbm's `main` wants a crate name no 23.2 tree defines |
+| `external/rust/hbm/0001` | `libash_latest_rust` → `libash_rust` | hbm's `main` wants a crate name no CrDroid 16 tree defines |
 | `external/rust/hbm/0002` | disable all six hbm modules | hbm needs ash 0.38+; this tree has 0.37.3 |
 | `external/rust/android-crates-io/0001` | set `drm_syncobj_handle.point` | AOSP ships drm-ffi 0.9.0 against a drm-sys that has the field |
 | `external/minigbm/0001` | drop the hbm dependency | soong refuses a live module depending on a disabled one |
@@ -25,7 +25,7 @@ written against ash 0.38+: `external/rust/hbm/hbm/src/sash.rs` uses the
 `ash::khr` and `ash::ext` submodules and the struct builder methods
 (`.push_next()`, `.src_offset()`, `.application_name()`).
 
-LineageOS 23.2 provides ash 0.37.3, which has `pub mod extensions` and no
+CrDroid 16 provides ash 0.37.3, which has `pub mod extensions` and no
 builders. Swapping `external/rust/android-crates-io` for the WayDroid-ATV fork
 does **not** help, because that fork is also 0.37.3. The result is 68 errors.
 
@@ -80,3 +80,11 @@ tools/gen-fork-patches.sh <los-root> "$PWD/base-patches-36/10-lineage-forks" fra
 
 `gen-fork-patches.sh` only writes the project paths it is asked for, so the
 hand-written patches under `external/` are untouched.
+
+## Conflicts outside this layer
+
+`15-ours` is not where a CrDroid 16 tree diverges most. The conflicts on this
+tree are in `10-lineage-forks` and `20-upstream`, and they are structural rather
+than textual: CrDroid carries commits LineageOS does not, so a hunk's context
+lines are present but a neighbouring line is not the one the patch expects.
+`docs/tools.md` covers the commit metadata needed to land each one.

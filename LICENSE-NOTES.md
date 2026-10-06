@@ -33,7 +33,7 @@ and everything in `tools/`. Full text in `LICENSE-APACHE-2.0`.
 These are not derived from any WayDroid commit. Each one fixes a defect in a
 project as published by its own upstream, discovered by building:
 
-- `external/rust/hbm/0001` renames a crate dependency that no 23.2 tree defines
+- `external/rust/hbm/0001` renames a crate dependency that no CrDroid 16 tree defines
 - `external/rust/hbm/0002` disables a project whose `main` needs ash 0.38+
 - `external/rust/android-crates-io/0001` sets a struct field AOSP's own drm-ffi
   source omits

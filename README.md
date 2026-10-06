@@ -1,6 +1,6 @@
-# WayDroid ATV on LineageOS 23.2 — as patches, not forks
+# WayDroid ATV on CrDroid 16 — as patches, not forks
 
-Branch `lineage-23.2`. Phone build, not Android TV.
+Branch `crdroid-16`. Phone build, not Android TV.
 
 Upstream [WayDroid-ATV](https://github.com/WayDroid-ATV) `remove-project`s ~15
 LineageOS projects and re-adds its own forks at the same paths, so every later

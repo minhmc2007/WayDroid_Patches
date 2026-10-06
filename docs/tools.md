@@ -1,6 +1,6 @@
 # Tools
 
-Four scripts. All are read-only with respect to your LineageOS tree except
+Five scripts. All are read-only with respect to your CrDroid tree except
 `gen-fork-patches.sh`, which writes into the patch repo.
 
 ## `waydroid-patches.sh`
@@ -22,6 +22,24 @@ author date and subject against the project history, not by
 lines, an already-applied earlier patch no longer reverse-applies cleanly and
 would look like a conflict. The reverse check is kept only as a fallback for
 patches that came from LineageOS itself and were merged upstream.
+
+That first test is why a hand resolved conflict has to be committed with the
+patch's own author date and subject. `git commit` defaults to now, so a resolved
+patch committed the obvious way is never recognised on the next run and the
+conflict comes back. Pass `--date` and `--author` from the patch header:
+
+```shell
+D=$(sed -n 's/^Date: //p' "$P" | head -1)
+A=$(sed -n 's/^From: //p' "$P" | head -1)
+N=${A%%<*}; M=${A##*<}; M=${M%>}
+S=$(sed -n 's/^Subject: //p' "$P" | head -1 | sed 's/^\[PATCH[^]]*\] *//')
+patch -p1 -F3 -i "$P" && git add -A . && \
+  GIT_COMMITTER_DATE="$D" git commit --date="$D" --author="$N <$M>" -m "$S"
+```
+
+`git am -3` reports `sha1 information is lacking` on every patch in this repo,
+because the generated patches carry no blob SHAs. It is not an error by itself;
+`patch -p1 -F3` is the fallback that actually lands them.
 
 ## `gen-fork-patches.sh`
 
@@ -72,6 +90,21 @@ The `action` column is the useful part:
 | `ok (diverged, N LOS commit(s) not in fork)` | fine; `gen-fork-patches.sh` diffs from the merge-base |
 | `nothing to do (fork has no commits we lack)` | e.g. `TvSettings`, 4 commits behind |
 | `REGENERATE` | fork moved, regenerate that project |
+
+## Checking the tree before applying
+
+The patches target CrDroid 16, which is `lineage-23.2` plus AOSP
+`android-16.0.0_r4`. A directory name is not evidence of that. Confirm before
+the first `apply`, because every patch in the stack will conflict against the
+wrong base and each resolution is then wasted:
+
+```shell
+grep -o 'default revision="[^"]*"' "$SRC/.repo/manifests/default.xml"
+grep -o 'revision="refs/tags/android-[0-9.]*_r[0-9]*"' "$SRC/.repo/manifests/default.xml" | head -1
+```
+
+Expect `refs/heads/lineage-23.2` and `android-16.0.0_r4`. A tree on
+`lineage-24.0` or `android-17.0.0_r1` is CrDroid 17 and is the wrong base.
 
 ## `check-dup-modules.py`
 

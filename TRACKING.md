@@ -1,4 +1,4 @@
-Waydroid-ATV fork tracking vs LineageOS lineage-23.2
+Waydroid-ATV fork tracking vs CrDroid 16
 ====================================================================================================
 project                       status     ahead behind  files  patches   action
 ----------------------------------------------------------------------------------------------------

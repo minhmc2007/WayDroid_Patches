@@ -4,7 +4,7 @@
 
 Waydroid and Waydroid-ATV changes as `.patch` files, layered on a stock LineageOS checkout. Meant to apply on almost any LineageOS-based ROM. No forks. Nothing LineageOS maintains gets removed or re-pointed.
 
-Default branch `lineage-23.2`. Phone build, not Android TV.
+Default branch `crdroid-16`. Phone build, not Android TV.
 
 Read `README.md`, `docs/tools.md`, `docs/build-fixes.md` before touching anything.
 
@@ -60,7 +60,7 @@ Same for missing info: ask, do not guess. Branch names, remotes, which upstream,
 
 ## Collecting patches from scratch
 
-1. Ask user for target branches: LineageOS branch and Waydroid / Waydroid-ATV branch. Do not assume `lineage-23.2`.
+1. Ask user for target branches: CrDroid branch and Waydroid / Waydroid-ATV branch. Do not assume `crdroid-16`.
 2. List the projects Waydroid changes. Source: the Waydroid-ATV manifest for that branch.
 3. Dispatch one read-only subagent per project, in parallel (cavecrew-investigator style: caveman output, one result block per project).
 4. Each subagent compares upstream to fork with the GitHub compare API, three-dot so only fork commits show:
