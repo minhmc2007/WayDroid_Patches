@@ -17,6 +17,7 @@ actual error.
 | `external/mesa3d/0001` | call `ld.lld` by absolute path | the meson rule's PATH has no AOSP clang directory |
 | `prebuilts/mesa-tools/0001` | symlink `libxml2.so.2` | the bundled `libLLVM.so.20.1` needs a soname the host does not have |
 | `packages/apps/FaceUnlock/0001` | drop 4 Megvii prebuilts from `required:` | they are `android_arm64` only, so kati fails the required deps check on x86_64 |
+| `packages/apps/crDroidSettings/0001` | set `build_maintainer_summary` | Settings shows "Device maintainer: Unofficial" until the name is set |
 
 ## Why hbm is disabled rather than fixed
 

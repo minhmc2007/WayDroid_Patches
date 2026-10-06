@@ -6,7 +6,7 @@ do not bleed into each other.
 | layer | patches | provenance | licence |
 |---|---|---|---|
 | `10-lineage-forks` | 140 | generated from upstream WayDroid commits | GPL-3.0 |
-| `15-ours` | 7 | hand-written here | Apache-2.0 |
+| `15-ours` | 8 | hand-written here | Apache-2.0 |
 | `20-upstream` | 53 | verbatim upstream `base-patches-36` | GPL-3.0 |
 
 ## GPL-3.0
@@ -27,7 +27,7 @@ projects each carry their own licence.
 
 ## Apache-2.0
 
-`15-ours/` holds the six patches written for this repo, plus `waydroid-patches.sh`
+`15-ours/` holds the eight patches written for this repo, plus `waydroid-patches.sh`
 and everything in `tools/`. Full text in `LICENSE-APACHE-2.0`.
 
 These are not derived from any WayDroid commit. Each one fixes a defect in a
@@ -46,5 +46,5 @@ Apache-2.0 does not appear to cover upstream's GPL-3.0 work.
 
 ## Per-patch detail
 
-See `docs/build-fixes.md` for what each of the six does and why, and
+See `docs/build-fixes.md` for what each of the eight does and why, and
 `TRACKING.md` for the fork deltas.

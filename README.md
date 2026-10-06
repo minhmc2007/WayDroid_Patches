@@ -71,7 +71,7 @@ Options: `-j <n>`, `--no-sync`, `--dry-run`, `--layer <name>`, `--only <project>
 never a LineageOS one. A diverged fork is fine: `lineage-sdk` is 2 LineageOS
 commits behind, and those stay untouched. GPL-3.0.
 
-`15-ours` (7) — hand-written build fixes, Apache-2.0, kept in their own layer so
+`15-ours` (8) — hand-written build fixes, Apache-2.0, kept in their own layer so
 the licences stay separate. `docs/build-fixes.md` explains each.
 
 `20-upstream` (53) — upstream's `base-patches-36` verbatim plus the `roms-patches`
@@ -128,7 +128,7 @@ Two environment gotchas:
 * 15 GB of RAM is under what kati wants; it was `SIGKILL`ed at "finishing Make
   module rules". A big swap file helps but does not remove the need for RAM.
 
-`docs/tools.md` covers the tooling. `docs/build-fixes.md` covers the seven
+`docs/tools.md` covers the tooling. `docs/build-fixes.md` covers the eight
 hand-written patches in `15-ours`,
 including the mesa-tools `libxml2.so.2` soname alias, which is an alias and not
 the library LLVM 20 was built against.
