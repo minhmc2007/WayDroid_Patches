@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: minhmc2007 <quangminh21072010@gmail.com>
+Date: Thu, 6 Oct 2026 15:15:00 +0700
+Subject: [PATCH] fix(FaceUnlock): drop the arm64-only Megvii prebuilts
+ from required
+
+  TARGET module FaceUnlock requires non-existent TARGET module:
+    libFaceDetectCA
+    ... 3 more
+  build/make/core/main.mk:506: error: Build failed.
+
+The four Megvii prebuilts declare only android_arm64 srcs, so soong emits
+no variant on x86_64 and kati fails the required-deps check at main.mk:497.
+
+TARGET_FACE_UNLOCK_SUPPORTED cannot reach this. It keeps FaceUnlock out of
+PRODUCT_PACKAGES, but frameworks/base/services/core statically requires
+vendor.aospa.biometrics.face, whose source lives in this project. That keeps
+the namespace in ALL_MODULES, and the check at main.mk:439 iterates
+ALL_MODULES, so the deps are validated whether or not the app is installed.
+
+The four modules stay defined below, just unreferenced. Gating the
+services/core dependency on a product variable would be the real fix.
+---
+diff --git a/Android.bp b/Android.bp
+index 82a72ca..f3bed18 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -25,11 +25,10 @@ android_app {
+         "vendor.aospa.biometrics.face.impl",
+     ],
+ 
++    // The Megvii prebuilts below are android_arm64 only, and frameworks/base
++    // hardcodes a dependency on this namespace, so kati checks them here on
++    // every arch even when this app is not installed.
+     required: [
+-        "libFaceDetectCA",
+-        "libmegface_faceunlock",
+-        "libMegviiUnlock",
+-        "libMegviiUnlock-jni-1.2",
+         "default_permissions_co.aospa.sense.xml",
+         "hiddenapi-whitelist-co.aospa.sense.xml",
+         "privapp_whitelist_co.aospa.sense.xml",
