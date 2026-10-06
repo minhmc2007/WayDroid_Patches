@@ -16,6 +16,7 @@ actual error.
 | `external/minigbm/0001` | drop the hbm dependency | soong refuses a live module depending on a disabled one |
 | `external/mesa3d/0001` | call `ld.lld` by absolute path | the meson rule's PATH has no AOSP clang directory |
 | `prebuilts/mesa-tools/0001` | symlink `libxml2.so.2` | the bundled `libLLVM.so.20.1` needs a soname the host does not have |
+| `packages/apps/FaceUnlock/0001` | drop 4 Megvii prebuilts from `required:` | they are `android_arm64` only, so kati fails the required deps check on x86_64 |
 
 ## Why hbm is disabled rather than fixed
 
@@ -80,6 +81,31 @@ tools/gen-fork-patches.sh <los-root> "$PWD/base-patches-36/10-lineage-forks" fra
 
 `gen-fork-patches.sh` only writes the project paths it is asked for, so the
 hand-written patches under `external/` are untouched.
+
+## The FaceUnlock one cannot be fixed from the product makefile
+
+Worth writing down, because the obvious fix looks right and does nothing.
+
+`TARGET_FACE_UNLOCK_SUPPORTED := false` keeps `FaceUnlock` out of
+`PRODUCT_PACKAGES`, which is the only thing that variable does. It does not
+remove the check, because `frameworks/base/services/core` statically requires
+`vendor.aospa.biometrics.face`, and that namespace's source lives in the
+`FaceUnlock` project. So the namespace stays in `ALL_MODULES`, and the loop at
+`build/make/core/main.mk:439` iterates `ALL_MODULES`, not `PRODUCT_PACKAGES`.
+The four Megvii deps are validated whether or not the app is installed.
+
+`device.mk` is also the wrong place: product makefiles are read *before*
+`BoardConfig.mk`, so a gate written there never reaches
+`vendor/lineage/config/crdroid.mk:64`.
+
+The fix is in `Android.bp`, dropping the four entries from `required:`. The
+prebuilt modules stay defined below, just unreferenced. Gating the
+`services/core` dependency on a product variable would be the real fix.
+
+This patch is shared with the `AxionOS-2.8` branch, same blob hash
+`82a72ca..f3bed18`. That is not a given: a `15-ours` patch is written against
+one tree, so before porting one between branches check that the blob hashes in
+the diff header still match.
 
 ## Conflicts outside this layer
 

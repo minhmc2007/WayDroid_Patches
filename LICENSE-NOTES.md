@@ -6,7 +6,7 @@ do not bleed into each other.
 | layer | patches | provenance | licence |
 |---|---|---|---|
 | `10-lineage-forks` | 140 | generated from upstream WayDroid commits | GPL-3.0 |
-| `15-ours` | 6 | hand-written here | Apache-2.0 |
+| `15-ours` | 7 | hand-written here | Apache-2.0 |
 | `20-upstream` | 53 | verbatim upstream `base-patches-36` | GPL-3.0 |
 
 ## GPL-3.0
